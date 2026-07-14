@@ -1,0 +1,8 @@
+{
+  "name": "Logic Match",
+  "description": "Um viciante jogo de lógica e números com blocos especiais, múltiplos modos, conquistas, missões e temas personalizáveis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
