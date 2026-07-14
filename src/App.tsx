@@ -132,6 +132,8 @@ export default function App() {
   const [fps, setFps] = useState<number>(60);
   const [lastMatchTime, setLastMatchTime] = useState<number>(0);
   const [isShuffling, setIsShuffling] = useState<boolean>(false);
+  const [activeSavedGame, setActiveSavedGame] = useState<any>(GameStorage.getActiveGame());
+  const isResumingRef = useRef(false);
 
   // Ref tracking for active gameplay timing
   const gameIntervalRef = useRef<any>(null);
@@ -191,6 +193,14 @@ export default function App() {
   };
 
   // Sync music state when config changes
+  useEffect(() => {
+    if (config.darkMode ?? true) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [config.darkMode]);
+
   useEffect(() => {
     if (config.musicEnabled) {
       SynthAudio.startMusic(true);
@@ -282,6 +292,19 @@ export default function App() {
     };
   }, [view, gameOver, victory, mode, levelId, isPaused]);
 
+  useEffect(() => {
+    if (view === 'game' && !gameOver && !victory && cells.length > 0 && !isResumingRef.current) {
+      const stateToSave = {
+        mode, difficulty, levelId, cells, cols, score, combo, timeLeft, survivalTick,
+        hintsLeft, highlightedIndices, clearedIce, clearedLocks, clearedBombs,
+        linesAddedCount, maxComboInLevel, clearedNumbersCount, lives, maxLives, shufflesLeft, movesLeft,
+        hintsUsed, powersUsed, lastMatchTime
+      };
+      GameStorage.saveActiveGame(stateToSave);
+      // Don't call setActiveSavedGame here to avoid unnecessary re-renders in the menu
+    }
+  }, [view, mode, difficulty, levelId, cells, cols, score, combo, timeLeft, survivalTick, hintsLeft, highlightedIndices, clearedIce, clearedLocks, clearedBombs, linesAddedCount, maxComboInLevel, clearedNumbersCount, lives, maxLives, shufflesLeft, movesLeft, hintsUsed, powersUsed, lastMatchTime, gameOver, victory]);
+
   // Handle Level XP and Profile state updates
   const handleXPAdd = (amount: number) => {
     const res = GameStorage.addXP(amount, profile);
@@ -294,8 +317,48 @@ export default function App() {
     }
   };
 
+  const resumeGame = () => {
+    if (activeSavedGame) {
+      isResumingRef.current = true;
+      SynthAudio.playClick(config.soundEnabled);
+      setMode(activeSavedGame.mode);
+      setDifficulty(activeSavedGame.difficulty);
+      setLevelId(activeSavedGame.levelId);
+      setCells(activeSavedGame.cells);
+      setCols(activeSavedGame.cols);
+      setScore(activeSavedGame.score);
+      setCombo(activeSavedGame.combo);
+      setTimeLeft(activeSavedGame.timeLeft);
+      setSurvivalTick(activeSavedGame.survivalTick);
+      setHintsLeft(activeSavedGame.hintsLeft);
+      setHighlightedIndices(activeSavedGame.highlightedIndices);
+      setClearedIce(activeSavedGame.clearedIce);
+      setClearedLocks(activeSavedGame.clearedLocks);
+      setClearedBombs(activeSavedGame.clearedBombs);
+      setLinesAddedCount(activeSavedGame.linesAddedCount);
+      setMaxComboInLevel(activeSavedGame.maxComboInLevel);
+      setClearedNumbersCount(activeSavedGame.clearedNumbersCount);
+      setLives(activeSavedGame.lives);
+      setMaxLives(activeSavedGame.maxLives);
+      setShufflesLeft(activeSavedGame.shufflesLeft);
+      setMovesLeft(activeSavedGame.movesLeft);
+      setHintsUsed(activeSavedGame.hintsUsed);
+      setPowersUsed(activeSavedGame.powersUsed);
+      setLastMatchTime(activeSavedGame.lastMatchTime);
+      setGameOver(false);
+      setVictory(false);
+      setIsPaused(false);
+      setView('game');
+      setTimeout(() => {
+        isResumingRef.current = false;
+      }, 100);
+    }
+  };
+
   // Start a new match
   const startNewGame = (selectedMode: GameMode, selectedDiff: Difficulty, challengeId: number | null = null) => {
+    GameStorage.clearActiveGame();
+    setActiveSavedGame(null);
     SynthAudio.playClick(config.soundEnabled);
     setMode(selectedMode);
     setDifficulty(selectedDiff);
@@ -395,6 +458,8 @@ export default function App() {
 
   const handleGameOver = () => {
     setGameOver(true);
+    GameStorage.clearActiveGame();
+    setActiveSavedGame(null);
     SynthAudio.playFail(config.soundEnabled);
 
     // Save defeat stat
@@ -445,6 +510,8 @@ export default function App() {
   };
 
   const handleVictory = (finalScore: number) => {
+    GameStorage.clearActiveGame();
+    setActiveSavedGame(null);
     // 1. Calculate Score Breakdown
     let diffPercent = 0.0;
     if (difficulty === 'medium') diffPercent = 0.2;
@@ -1122,13 +1189,60 @@ export default function App() {
 
             {/* Play Options Grid */}
             <div className="flex flex-col gap-3">
+              {activeSavedGame && (
+                <button
+                  id="resume-game-btn"
+                  onClick={resumeGame}
+                  className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all border border-orange-500/50 bg-orange-500 text-white hover:bg-orange-600 active:scale-95`}
+                >
+                  <Play className="w-4 h-4 fill-current text-current" />
+                  <span>{config.language === 'pt' ? 'Continuar Partida' : config.language === 'es' ? 'Continuar Partida' : 'Resume Game'}</span>
+                </button>
+              )}
+              
               <button
                 id="play-classic-btn"
                 onClick={() => startNewGame('classic', 'medium')}
-                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeTheme.primaryBtn}`}
+                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeSavedGame ? activeTheme.secondaryBtn : activeTheme.primaryBtn}`}
               >
                 <Play className="w-4 h-4 fill-current text-current" />
-                <span>{t.play}</span>
+                <span>{activeSavedGame ? (config.language === 'pt' ? 'Novo Jogo' : config.language === 'es' ? 'Nuevo Juego' : 'New Game') : t.classic}</span>
+              </button>
+
+              <button
+                id="play-relax-btn"
+                onClick={() => startNewGame('relax', 'easy')}
+                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeTheme.secondaryBtn}`}
+              >
+                <Sparkles className="w-4 h-4 text-current" />
+                <span>{t.relax}</span>
+              </button>
+
+              <button
+                id="play-timed-btn"
+                onClick={() => startNewGame('timed', 'hard')}
+                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeTheme.secondaryBtn}`}
+              >
+                <Clock className="w-4 h-4 text-current" />
+                <span>{t.timed}</span>
+              </button>
+
+              <button
+                id="play-survival-btn"
+                onClick={() => startNewGame('survival', 'hard')}
+                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeTheme.secondaryBtn}`}
+              >
+                <Flame className="w-4 h-4 text-current" />
+                <span>{t.survival}</span>
+              </button>
+
+              <button
+                id="play-infinite-btn"
+                onClick={() => startNewGame('infinite', 'hard')}
+                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeTheme.secondaryBtn}`}
+              >
+                <Infinity className="w-4 h-4 text-current" />
+                <span>{t.infinite}</span>
               </button>
 
               <button
@@ -1663,6 +1777,8 @@ export default function App() {
                 id="exit-confirm-yes-btn"
                 onClick={() => {
                   SynthAudio.playClick(config.soundEnabled);
+                  GameStorage.clearActiveGame();
+                  setActiveSavedGame(null);
                   setView(levelId ? 'levels' : 'menu');
                   setIsPaused(false);
                   setShowExitConfirm(false);

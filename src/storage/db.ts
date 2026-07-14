@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
   PROFILE: 'numzen_profile',
   ACHIEVEMENTS: 'numzen_achievements',
   MISSIONS: 'numzen_missions',
-  MISSIONS_DATE: 'numzen_missions_date'
+  MISSIONS_DATE: 'numzen_missions_date',
+  ACTIVE_GAME: 'numzen_active_game'
 };
 
 const DEFAULT_CONFIG: GameConfig = {
@@ -275,5 +276,18 @@ export const GameStorage = {
       console.error('Import error:', e);
     }
     return false;
+  },
+
+  getActiveGame(): any | null {
+    const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_GAME);
+    return data ? JSON.parse(data) : null;
+  },
+  
+  saveActiveGame(state: any) {
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_GAME, JSON.stringify(state));
+  },
+  
+  clearActiveGame() {
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
   }
 };
