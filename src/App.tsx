@@ -1016,7 +1016,7 @@ export default function App() {
       )}
 
       {/* TOP HEADER */}
-      <header className={`px-6 py-4 flex justify-between items-center z-10 border-b bg-current/[0.02] ${activeTheme.borderPrimary}`}>
+      <header className={`px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center z-10 border-b bg-current/[0.02] ${activeTheme.borderPrimary}`}>
         <div
           id="brand"
           onClick={() => {
@@ -1079,7 +1079,7 @@ export default function App() {
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className={`flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full mx-auto transition-all duration-300 ${view === 'game' || view === 'levels' ? 'max-w-5xl' : 'max-w-4xl'}`}>
+      <main className={`flex-1 flex flex-col items-center justify-start lg:justify-center p-2 sm:p-4 relative z-10 w-full mx-auto transition-all duration-300 ${view === 'game' || view === 'levels' ? 'max-w-5xl' : 'max-w-4xl'}`}>
         
         {/* VIEW: MENU */}
         {view === 'menu' && (
@@ -1128,30 +1128,7 @@ export default function App() {
                 className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeTheme.primaryBtn}`}
               >
                 <Play className="w-4 h-4 fill-current text-current" />
-                <span>Modo Clássico</span>
-              </button>
-
-              <button
-                id="play-challenges-btn"
-                onClick={() => {
-                  SynthAudio.playClick(config.soundEnabled);
-                  setView('levels');
-                }}
-                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all ${activeTheme.secondaryBtn}`}
-              >
-                <Trophy className="w-4 h-4 text-yellow-500" />
-                <span>Desafios Progressivos ({Math.min(15, currentLevelUnlocked - 1)}/15)</span>
-              </button>
-
-              <button
-                id="play-infinite-btn"
-                onClick={() => startNewGame('infinite', 'medium')}
-                className={`py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-lg transition-all border-2 border-dashed border-yellow-500/50 bg-yellow-500/5 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/10 active:scale-95`}
-              >
-                <Infinity className="w-5 h-5 text-yellow-500 animate-pulse-subtle" />
-                <span>
-                  {config.language === 'pt' ? 'Modo Infinito' : config.language === 'es' ? 'Modo Infinito' : 'Infinite Mode'}
-                </span>
+                <span>{t.play}</span>
               </button>
 
               <button
@@ -1176,23 +1153,6 @@ export default function App() {
                   <span>{config.language === 'pt' ? 'Instalar Aplicativo (PWA)' : config.language === 'es' ? 'Instalar Aplicación (PWA)' : 'Install Application (PWA)'}</span>
                 </button>
               )}
-
-              {/* Grid of Other Modes */}
-              <div className="grid grid-cols-2 gap-2.5">
-                {(['relax', 'timed', 'survival', 'frozen', 'bombs', 'locks'] as const).map(m => (
-                  <button
-                    id={`play-mode-${m}`}
-                    key={m}
-                    onClick={() => startNewGame(m, 'medium')}
-                    className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1 text-[11px] uppercase tracking-wider font-semibold transition-all active:scale-95 ${activeTheme.itemBg} ${activeTheme.textPrimary}`}
-                  >
-                    <span>{t[m] || m}</span>
-                    <span className={`text-[9px] font-mono font-normal opacity-60 ${activeTheme.textSecondary}`}>
-                      Recorde: {stats.highScore[m] || 0}
-                    </span>
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Navigation Drawer Shortcuts */}

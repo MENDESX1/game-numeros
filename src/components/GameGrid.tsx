@@ -117,7 +117,7 @@ export const GameGrid: React.FC<GameGridProps> = ({
     >
       <div
         id="game-grid"
-        className={`grid gap-1.5 p-3 rounded-2xl w-full max-w-lg shadow-2xl border ${themeStyles.gridBg}`}
+        className={`grid gap-1 sm:gap-1.5 p-1.5 sm:p-3 rounded-2xl w-full max-w-lg shadow-2xl border ${themeStyles.gridBg}`}
         style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`

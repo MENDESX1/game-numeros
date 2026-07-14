@@ -218,10 +218,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   return (
     <div 
       id="game-info-panel"
-      className={`w-full flex flex-col gap-4 p-5 rounded-2xl border transition-all duration-300 ${themeStyles.cardBg}`}
+      className={`w-full flex flex-col gap-3 sm:gap-4 p-3 sm:p-5 rounded-2xl border transition-all duration-300 ${themeStyles.cardBg}`}
     >
       {/* Title & Mode Identifier */}
-      <div className="flex items-center justify-between border-b pb-3.5 border-current/10">
+      <div className="flex items-center justify-between border-b pb-2.5 sm:pb-3.5 border-current/10">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div 
             className="p-2.5 rounded-xl shrink-0 flex items-center justify-center text-white"
@@ -278,7 +278,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
       </div>
 
       {/* Real-time Score Display */}
-      <div className={`p-3 rounded-xl flex items-center justify-between border ${themeStyles.itemBg}`}>
+      <div className={`p-2.5 sm:p-3 rounded-xl flex items-center justify-between border ${themeStyles.itemBg}`}>
         <div className="flex flex-col">
           <span className={`text-[9px] uppercase tracking-widest font-bold ${themeStyles.textSecondary}`}>
             {TRANSLATIONS[config.language].score}
