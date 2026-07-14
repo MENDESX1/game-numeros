@@ -1,4 +1,5 @@
-const CACHE_NAME = 'numzen-cache-v1';
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `numzen-cache-${CACHE_VERSION}`;
 const OFFLINE_URL = '/index.html';
 
 // Pre-cache core shell assets
@@ -12,11 +13,12 @@ const PRECACHE_ASSETS = [
 
 // Install Event
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Force the waiting service worker to become the active service worker
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Pre-caching offline page and core assets');
       return cache.addAll(PRECACHE_ASSETS);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -32,7 +34,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()) // Become available to all pages
   );
 });
 
@@ -42,14 +44,15 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
+  
+  // Ignore chrome extensions or external requests like google analytics/adsense
+  if (!url.protocol.startsWith('http') || url.origin !== self.location.origin) return;
 
   // Navigation requests (HTML pages) -> Network-First
   if (event.request.mode === 'navigate' || event.request.headers.get('accept').includes('text/html')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Clone and cache the latest version
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);
@@ -57,43 +60,28 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // If offline, return the cached page
           return caches.match(OFFLINE_URL);
         })
     );
     return;
   }
 
-  // Static assets and other requests -> Cache-First
+  // Static assets (CSS, JS, Images) -> Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached asset, and fetch in background to update cache (stale-while-revalidate style)
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse);
-              });
-            }
-          })
-          .catch(() => { /* Ignore network errors */ });
-        return cachedResponse;
-      }
-
-      // If not in cache, fetch from network and cache
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
         return networkResponse;
+      }).catch(() => {
+        // Ignore network errors on fetch for stale-while-revalidate
       });
+
+      return cachedResponse || fetchPromise;
     })
   );
 });

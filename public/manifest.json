@@ -3,11 +3,13 @@
   "short_name": "NumZen",
   "description": "Um viciante jogo de lógica e números com blocos especiais, múltiplos modos, conquistas, missões e temas personalizáveis.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#08081a",
   "theme_color": "#08081a",
   "orientation": "portrait",
-  "categories": ["games", "education"],
+  "lang": "pt-BR",
+  "categories": ["games", "puzzle", "entertainment"],
   "icons": [
     {
       "src": "/icons/icon-192x192.jpg",
