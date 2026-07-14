@@ -14,10 +14,10 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
-        console.log('NumZen PWA Service Worker registered successfully with scope:', registration.scope);
+        console.log('LogicMatch PWA Service Worker registered successfully with scope:', registration.scope);
       })
       .catch((error) => {
-        console.error('NumZen PWA Service Worker registration failed:', error);
+        console.error('LogicMatch PWA Service Worker registration failed:', error);
       });
   });
 }

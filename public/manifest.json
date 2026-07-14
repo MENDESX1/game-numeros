@@ -1,6 +1,6 @@
 {
-  "name": "Logic Match",
-  "short_name": "NumZen",
+  "name": "LogicMatch",
+  "short_name": "LogicMatch",
   "description": "Um viciante jogo de lógica e números com blocos especiais, múltiplos modos, conquistas, missões e temas personalizáveis.",
   "start_url": "/",
   "scope": "/",

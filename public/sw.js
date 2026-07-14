@@ -1,5 +1,5 @@
 const CACHE_VERSION = 'v2';
-const CACHE_NAME = `numzen-cache-${CACHE_VERSION}`;
+const CACHE_NAME = `logicmatch-cache-${CACHE_VERSION}`;
 const OFFLINE_URL = '/index.html';
 
 // Pre-cache core shell assets
