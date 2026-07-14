@@ -33,6 +33,10 @@ export default function App() {
   // PWA states
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState<boolean>(false);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [isIOS, setIsIOS] = useState<boolean>(false);
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [showIOSInstallGuide, setShowIOSInstallGuide] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false);
@@ -178,6 +182,42 @@ export default function App() {
       window.removeEventListener('touchstart', handleFirstTouch);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       SynthAudio.stopMusic();
+    };
+  }, []);
+
+  // PWA shortcut launcher, network listeners and iOS Safari detection
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast(config.language === 'pt' ? 'Conectado à internet!' : config.language === 'es' ? '¡Conectado a internet!' : 'Connected to internet!', 'success');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast(config.language === 'pt' ? 'Você está jogando offline. O progresso será salvo localmente.' : config.language === 'es' ? 'Estás jugando offline. El progreso se guardará localmente.' : 'You are playing offline. Progress will be saved locally.', 'info');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // iOS Safari Detection
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+    setIsIOS(isIOSDevice);
+    setIsStandalone(isStandaloneMode);
+
+    // Deep-link check for PWA shortcuts (?mode=...)
+    const params = new URLSearchParams(window.location.search);
+    const modeParam = params.get('mode');
+    if (modeParam === 'classic' || modeParam === 'survival' || modeParam === 'relax' || modeParam === 'timed' || modeParam === 'infinite') {
+      setTimeout(() => {
+        startNewGame(modeParam as GameMode, modeParam === 'relax' ? 'easy' : 'medium');
+        // Clean URL query parameters so page reload doesn't trigger startNewGame again
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }, 800);
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
@@ -1131,6 +1171,18 @@ export default function App() {
             <span>{profile.coins.toLocaleString()}</span>
           </div>
 
+          {/* Offline Indicator */}
+          {!isOnline && (
+            <div
+              id="offline-badge"
+              className="flex items-center gap-1.5 py-1 px-3 rounded-full border border-red-500/30 bg-red-500/10 text-[10px] font-bold text-red-500 dark:text-red-400 animate-pulse"
+              title="Modo Offline Ativo"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              <span>OFFLINE</span>
+            </div>
+          )}
+
           {/* Settings button */}
           <button
             id="settings-trigger"
@@ -1304,6 +1356,33 @@ export default function App() {
                 <span>{t.stats}</span>
               </button>
             </div>
+
+            {/* iOS Safari Install Guide (Only shown on iOS when not installed) */}
+            {isIOS && !isStandalone && (
+              <div
+                id="ios-install-banner"
+                className={`p-4 rounded-2xl border flex flex-col gap-2 mt-2 text-xs text-left animate-fadeIn ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}
+              >
+                <div className="flex items-center gap-2 font-bold text-sky-500">
+                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+                  <span>Instalar no iPhone / iPad</span>
+                </div>
+                <p className="opacity-80 leading-relaxed text-[11px]">
+                  Jogue em tela cheia e offline adicionando o jogo à sua tela de início:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 opacity-90 pl-1 text-[11px]">
+                  <li>
+                    Toque no ícone de <span className="font-bold underline text-sky-400">Compartilhar</span> na barra do Safari (ícone <span className="inline-block bg-white/10 px-1 py-0.5 rounded text-[10px]">📤</span>).
+                  </li>
+                  <li>
+                    Role para baixo e selecione <span className="font-bold underline text-sky-400">"Adicionar à Tela de Início"</span> (ícone <span className="inline-block bg-white/10 px-1.5 py-0.5 rounded text-[10px] font-mono">+</span>).
+                  </li>
+                  <li>
+                    Abra o app direto de sua tela de início para jogar sem barras e 100% offline!
+                  </li>
+                </ol>
+              </div>
+            )}
           </div>
         )}
 

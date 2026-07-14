@@ -35,5 +35,46 @@
       "type": "image/jpeg",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Modo Clássico",
+      "short_name": "Clássico",
+      "description": "Jogar o Modo Clássico de Números",
+      "url": "/?mode=classic",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.jpg",
+          "sizes": "192x192",
+          "type": "image/jpeg"
+        }
+      ]
+    },
+    {
+      "name": "Modo Sobrevivência",
+      "short_name": "Sobrevivência",
+      "description": "Desafie a velocidade no Modo Sobrevivência",
+      "url": "/?mode=survival",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.jpg",
+          "sizes": "192x192",
+          "type": "image/jpeg"
+        }
+      ]
+    },
+    {
+      "name": "Modo Relaxado",
+      "short_name": "Relax",
+      "description": "Combine números sem pressão",
+      "url": "/?mode=relax",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.jpg",
+          "sizes": "192x192",
+          "type": "image/jpeg"
+        }
+      ]
+    }
   ]
 }
