@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "LogicMatch",
   "short_name": "LogicMatch",
   "description": "Um viciante jogo de lógica e números com blocos especiais, múltiplos modos, conquistas, missões e temas personalizáveis.",
@@ -9,6 +10,7 @@
   "theme_color": "#08081a",
   "orientation": "portrait-primary",
   "lang": "pt-BR",
+  "prefer_related_applications": false,
   "categories": ["games", "puzzle", "entertainment"],
   "icons": [
     {

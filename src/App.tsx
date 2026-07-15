@@ -173,6 +173,14 @@ export default function App() {
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // PWA: Listen for successful installation
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+      showToast(config.language === 'pt' ? 'Aplicativo instalado com sucesso na sua grade de aplicativos!' : 'Application successfully installed on your app grid!', 'success');
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
     // PWA: Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstallable(false);
@@ -182,6 +190,7 @@ export default function App() {
       window.removeEventListener('click', handleFirstTouch);
       window.removeEventListener('touchstart', handleFirstTouch);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
       SynthAudio.stopMusic();
     };
   }, []);
