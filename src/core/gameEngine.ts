@@ -473,76 +473,58 @@ export const GameEngine = {
     return value1 === value2 || value1 + value2 === 10;
   },
 
-  // Main adjacency algorithm: horizontal, vertical, diagonal, or continuous pathfinding
+  // Main adjacency algorithm: horizontal, vertical, or continuous 1D wrapping pathfinding
   checkAdjacent(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
     if (idxA === idxB) return false;
     if (cells[idxA].removed || cells[idxB].removed) return false;
 
-    const total = cells.length;
     const minIdx = Math.min(idxA, idxB);
     const maxIdx = Math.max(idxA, idxB);
 
-    // 1. Continuous (Linear) Wrapping Adjacency
-    // In Number Match, two cells are adjacent linear-wise if there are no active cells between them
-    let activeBetweenLinear = 0;
+    const r1 = Math.floor(idxA / cols);
+    const c1 = idxA % cols;
+    const r2 = Math.floor(idxB / cols);
+    const c2 = idxB % cols;
+
+    // 1. Horizontal check (same row, all cells in between must be removed)
+    if (r1 === r2) {
+      const minCol = Math.min(c1, c2);
+      const maxCol = Math.max(c1, c2);
+      let blocked = false;
+      for (let c = minCol + 1; c < maxCol; c++) {
+        const idx = r1 * cols + c;
+        if (!cells[idx].removed) {
+          blocked = true;
+          break;
+        }
+      }
+      if (!blocked) return true;
+    }
+
+    // 2. Vertical check (same column, all cells in between must be removed)
+    if (c1 === c2) {
+      const minRow = Math.min(r1, r2);
+      const maxRow = Math.max(r1, r2);
+      let blocked = false;
+      for (let r = minRow + 1; r < maxRow; r++) {
+        const idx = r * cols + c1;
+        if (!cells[idx].removed) {
+          blocked = true;
+          break;
+        }
+      }
+      if (!blocked) return true;
+    }
+
+    // 3. Linear wrapping check (no active cells in 1D array between minIdx and maxIdx)
+    let blocked1D = false;
     for (let i = minIdx + 1; i < maxIdx; i++) {
       if (!cells[i].removed) {
-        activeBetweenLinear++;
+        blocked1D = true;
+        break;
       }
     }
-    if (activeBetweenLinear === 0) {
-      return true;
-    }
-
-    // 2. 2D Pathfinding (BFS) through empty (removed) cells
-    // Allows matching numbers that have a clear free path of empty cells between them
-    const rows = Math.ceil(total / cols);
-    const queue: number[] = [idxA];
-    const visited = new Set<number>();
-    visited.add(idxA);
-
-    const dirs = [
-      [-1, 0], [1, 0], [0, -1], [0, 1],     // Cardinal
-      [-1, -1], [-1, 1], [1, -1], [1, 1]   // Diagonals
-    ];
-
-    while (queue.length > 0) {
-      const curr = queue.shift()!;
-      if (curr === idxB) return true;
-
-      const r = Math.floor(curr / cols);
-      const c = curr % cols;
-
-      for (const [dr, dc] of dirs) {
-        const nr = r + dr;
-        const nc = c + dc;
-
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          const nextIdx = nr * cols + nc;
-          if (nextIdx < total && !visited.has(nextIdx)) {
-            // We can step if it is our destination or if the cell is already removed/empty
-            if (nextIdx === idxB || cells[nextIdx].removed) {
-              visited.add(nextIdx);
-              queue.push(nextIdx);
-            }
-          }
-        }
-      }
-
-      // Also allow linear wrapping step (moving left/right dynamically across rows)
-      if (curr + 1 < total && !visited.has(curr + 1)) {
-        if (curr + 1 === idxB || cells[curr + 1].removed) {
-          visited.add(curr + 1);
-          queue.push(curr + 1);
-        }
-      }
-      if (curr - 1 >= 0 && !visited.has(curr - 1)) {
-        if (curr - 1 === idxB || cells[curr - 1].removed) {
-          visited.add(curr - 1);
-          queue.push(curr - 1);
-        }
-      }
-    }
+    if (!blocked1D) return true;
 
     return false;
   },

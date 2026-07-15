@@ -699,10 +699,15 @@ export default function App() {
 
   // Main cell tap match handler with full kinetic glide feedback, particles, and floating score pops
   const handleCellClick = (idx: number) => {
-    if (gameOver || victory || invalidMatch || animatingMatch) return;
+    if (gameOver || victory || animatingMatch) return;
+
+    // Clear any previous invalid shake if a new cell is clicked, avoiding getting stuck
+    if (invalidMatch) {
+      setInvalidMatch(null);
+    }
 
     const clickedCell = cells[idx];
-    if (clickedCell.removed || clickedCell.locked) return;
+    if (clickedCell.removed || clickedCell.value === 0 || clickedCell.locked) return;
 
     if (selectedIndex === null) {
       // First selection
@@ -721,13 +726,17 @@ export default function App() {
       const isAdjacent = GameEngine.checkAdjacent(selectedIndex, idx, cells, cols);
 
       if (isMatchable && isAdjacent) {
-        // Valid Match! Start glide visual approximation animation
-        const r1 = Math.floor(selectedIndex / cols);
-        const c1 = selectedIndex % cols;
+        // Valid Match!
+        const firstIdx = selectedIndex; // Store local reference
+        setSelectedIndex(null); // Clear selectedIndex immediately to prevent double-matching/selection!
+
+        // Start glide visual approximation animation
+        const r1 = Math.floor(firstIdx / cols);
+        const c1 = firstIdx % cols;
         const r2 = Math.floor(idx / cols);
         const c2 = idx % cols;
 
-        setAnimatingMatch({ idxA: selectedIndex, idxB: idx, r1, c1, r2, c2 });
+        setAnimatingMatch({ idxA: firstIdx, idxB: idx, r1, c1, r2, c2 });
 
         // Score formula: balanced by difficulty and combo multipliers
         let diffMult = 1.0;
@@ -751,7 +760,7 @@ export default function App() {
           setLastMatchTime(now);
         }
 
-        const result = GameEngine.executeMatch(selectedIndex, idx, cells, cols);
+        const result = GameEngine.executeMatch(firstIdx, idx, cells, cols);
 
         // Safely cleared bomb bonus
         let safeBombBonusScore = 0;
@@ -780,7 +789,7 @@ export default function App() {
         const particleColor = activeTheme.accentColor || '#10b981';
         setActiveExplosions(prev => [
           ...prev,
-          { id: explosionIdA, idx: selectedIndex, color: particleColor },
+          { id: explosionIdA, idx: firstIdx, color: particleColor },
           { id: explosionIdB, idx, color: particleColor }
         ]);
 
@@ -960,11 +969,11 @@ export default function App() {
           }
         }
 
-        // Set invalid match state to show shaking red cells and error explanation
-        setInvalidMatch({ idxA: selectedIndex, idxB: idx, message: explanation });
+        const prevSelectedIndex = selectedIndex;
+        setSelectedIndex(null); // Clear selectedIndex immediately so user can select another cell right away
 
-        // Deselect
-        setSelectedIndex(null);
+        // Set invalid match state to show shaking red cells and error explanation
+        setInvalidMatch({ idxA: prevSelectedIndex, idxB: idx, message: explanation });
 
         // Deduct life (except in relax) or deduct 10s (in timed)
         if (mode === 'timed') {
