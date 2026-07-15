@@ -883,18 +883,21 @@ export default function App() {
             });
 
             if (bombsDetonatedCount > 0) {
-              // Explode bombs violently! Deduct lives.
-              setLives(prev => {
-                const damage = bombsDetonatedCount * 2;
-                const nextLives = Math.max(0, prev - damage);
-                if (nextLives <= 0) {
-                  setTimeout(() => handleGameOver(), 150);
-                }
-                return nextLives;
-              });
+              if (mode === 'survival') {
+                setLives(prev => {
+                  const damage = bombsDetonatedCount * 2;
+                  const nextLives = Math.max(0, prev - damage);
+                  if (nextLives <= 0) {
+                    setTimeout(() => handleGameOver(), 150);
+                  }
+                  return nextLives;
+                });
+                showToast(`💥 ${bombsDetonatedCount} BOMBA(S) DETONARAM! -${bombsDetonatedCount * 2} VIDAS!`, 'error');
+              } else {
+                showToast(`💥 ${bombsDetonatedCount} BOMBA(S) DETONARAM!`, 'error');
+              }
 
               SynthAudio.playExplosion(config.soundEnabled);
-              showToast(`💥 ${bombsDetonatedCount} BOMBA(S) DETONARAM! -${bombsDetonatedCount * 2} VIDAS!`, 'error');
 
               explodedByBombs.forEach(eIdx => {
                 const bombExplosionId = Math.random().toString();
@@ -975,10 +978,10 @@ export default function App() {
         // Set invalid match state to show shaking red cells and error explanation
         setInvalidMatch({ idxA: prevSelectedIndex, idxB: idx, message: explanation });
 
-        // Deduct life (except in relax) or deduct 10s (in timed)
+        // Deduct life (only in survival) or deduct 10s (in timed)
         if (mode === 'timed') {
           setTimeLeft(prev => Math.max(0, prev - 10)); // 10s penalty
-        } else if (mode !== 'relax') {
+        } else if (mode === 'survival') {
           setLives(prev => {
             const nextLives = prev - 1;
             if (nextLives <= 0) {

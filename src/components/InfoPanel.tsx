@@ -345,7 +345,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Key Stats Grid: Time, Moves, Lives */}
       <div className="grid grid-cols-2 gap-2 mt-1 pt-3.5 border-t border-current/10">
         {/* Lives / Mistakes Tracker */}
-        {mode !== 'relax' && mode !== 'timed' && (
+        {mode === 'survival' && (
           <div className={`p-2.5 rounded-xl border flex flex-col items-center justify-center text-center ${themeStyles.itemBg}`}>
             <span className={`text-[9px] uppercase tracking-wider font-semibold mb-1 ${themeStyles.textSecondary}`}>
               Vidas
