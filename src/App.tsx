@@ -324,13 +324,27 @@ export default function App() {
 
   // PWA: Install click handler
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
     SynthAudio.playClick(config.soundEnabled);
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User installation choice: ${outcome}`);
-    setDeferredPrompt(null);
-    setIsInstallable(false);
+    if (!deferredPrompt) {
+      if (isIOS && !isStandalone) {
+        setShowIOSInstallGuide(true);
+      } else if (isStandalone) {
+        showToast(config.language === 'pt' ? 'Aplicativo já está instalado e rodando em modo standalone!' : 'App is already installed and running in standalone mode!', 'info');
+      } else {
+        showToast(config.language === 'pt' ? 'Para instalar, use a opção "Adicionar à Tela Inicial" no menu do navegador.' : 'To install, use the "Add to Home Screen" option in your browser menu.', 'info');
+      }
+      return;
+    }
+    
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User installation choice: ${outcome}`);
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    } catch (err) {
+      console.error('Failed to prompt install:', err);
+    }
   };
 
   // Sync music state when config changes
@@ -1411,29 +1425,15 @@ export default function App() {
               </button>
 
               <button
-                id="play-tutorial-btn"
-                onClick={() => {
-                  SynthAudio.playClick(config.soundEnabled);
-                  setTutorialStep(0);
-                }}
-                className={`py-3.5 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-md transition-all border border-cyan-500/20 bg-cyan-500/5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10`}
+                id="install-pwa-btn"
+                onClick={handleInstallClick}
+                className="py-3.5 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-md transition-all border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 animate-pulse-subtle"
               >
-                <HelpCircle className="w-4 h-4 text-current" />
-                <span>Como Jogar (Tutorial)</span>
+                <Sparkles className="w-4 h-4 text-emerald-500" />
+                <span>{config.language === 'pt' ? 'Instalar Aplicativo (PWA)' : config.language === 'es' ? 'Instalar Aplicación (PWA)' : 'Install Application (PWA)'}</span>
               </button>
-
-              {isInstallable && (
-                <button
-                  id="install-pwa-btn"
-                  onClick={handleInstallClick}
-                  className="py-3.5 rounded-xl font-bold uppercase tracking-widest text-xs flex justify-center items-center gap-2.5 cursor-pointer shadow-md transition-all border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 animate-pulse-subtle"
-                >
-                  <Sparkles className="w-4 h-4 text-emerald-500" />
-                  <span>{config.language === 'pt' ? 'Instalar Aplicativo (PWA)' : config.language === 'es' ? 'Instalar Aplicación (PWA)' : 'Install Application (PWA)'}</span>
-                </button>
-              )}
             </div>
-
+            
             {/* Navigation Drawer Shortcuts */}
             <div className={`flex justify-around items-center pt-3 border-t ${activeTheme.borderPrimary}`}>
               <button
