@@ -1,14 +1,15 @@
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = `logicmatch-cache-${CACHE_VERSION}`;
 const OFFLINE_URL = '/index.html';
 
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json',
+  '/manifest.webmanifest',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  '/favicon.png'
+  '/favicon.png',
+  '/favicon.ico'
 ];
 
 self.addEventListener('install', (event) => {
