@@ -41,6 +41,7 @@ export default function App() {
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
+  const [showPWAExitConfirm, setShowPWAExitConfirm] = useState<boolean>(false);
 
   // Tutorial states
   const [seenTutorial, setSeenTutorial] = useState<boolean>(() => {
@@ -220,6 +221,80 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // PWA Back Button Handling: Intercepts physical back button / back gesture to act as native app navigation
+  useEffect(() => {
+    // Push a guard state so back button can always be intercepted
+    const pushGuard = () => {
+      if (!window.history.state || !window.history.state.pwaGuard) {
+        window.history.pushState({ pwaGuard: true }, '');
+      }
+    };
+
+    pushGuard();
+
+    const handlePopState = (e: PopStateEvent) => {
+      if ((window as any)._pwaExiting) {
+        return;
+      }
+
+      // Restore guard immediately to continue interception
+      pushGuard();
+
+      // Custom native back-button action flow:
+      if (showPWAExitConfirm) {
+        setShowPWAExitConfirm(false);
+        SynthAudio.playClick(config.soundEnabled);
+        return;
+      }
+
+      if (activeModal !== null) {
+        setActiveModal(null);
+        SynthAudio.playClick(config.soundEnabled);
+        return;
+      }
+
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        SynthAudio.playClick(config.soundEnabled);
+        return;
+      }
+
+      if (showRestartConfirm) {
+        setShowRestartConfirm(false);
+        SynthAudio.playClick(config.soundEnabled);
+        return;
+      }
+
+      if (isPaused) {
+        setIsPaused(false);
+        SynthAudio.playClick(config.soundEnabled);
+        return;
+      }
+
+      if (view === 'game') {
+        setShowExitConfirm(true);
+        SynthAudio.playClick(config.soundEnabled);
+        return;
+      }
+
+      if (view === 'levels') {
+        setView('menu');
+        SynthAudio.playClick(config.soundEnabled);
+        return;
+      }
+
+      if (view === 'menu') {
+        setShowPWAExitConfirm(true);
+        SynthAudio.playClick(config.soundEnabled);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [view, activeModal, isPaused, showPWAExitConfirm, showExitConfirm, showRestartConfirm, config.soundEnabled]);
 
   // PWA: Install click handler
   const handleInstallClick = async () => {
@@ -1931,6 +2006,47 @@ export default function App() {
             localStorage.setItem('numzen_seen_tutorial', 'true');
           }}
         />
+      )}
+
+      {/* PWA NATIVE SYSTEM EXIT CONFIRMATION MODAL */}
+      {showPWAExitConfirm && (
+        <div id="dialog-pwa-exit-confirm" className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 animate-fadeIn">
+          <div className={`p-8 rounded-2xl border max-w-sm w-full text-center flex flex-col gap-6 items-center shadow-2xl ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}>
+            <div className="p-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 animate-pulse">
+              <Sparkles className="w-10 h-10 text-emerald-400" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <h3 className="text-2xl font-serif font-medium text-white tracking-tight">Sair do LogicMatch?</h3>
+              <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
+                Tem certeza que deseja fechar o aplicativo? Seu progresso e conquistas estão salvos com segurança.
+              </p>
+            </div>
+            <div className="flex gap-3 w-full mt-2">
+              <button
+                id="pwa-exit-yes-btn"
+                onClick={() => {
+                  SynthAudio.playClick(config.soundEnabled);
+                  (window as any)._pwaExiting = true;
+                  setShowPWAExitConfirm(false);
+                  window.history.go(-2);
+                }}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-black transition-all active:scale-[0.96] cursor-pointer shadow-lg shadow-emerald-500/10"
+              >
+                Sim, Sair
+              </button>
+              <button
+                id="pwa-exit-no-btn"
+                onClick={() => {
+                  SynthAudio.playClick(config.soundEnabled);
+                  setShowPWAExitConfirm(false);
+                }}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-widest border border-white/10 hover:bg-white/5 text-white transition-all active:scale-[0.96] cursor-pointer"
+              >
+                Voltar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

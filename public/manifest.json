@@ -7,7 +7,7 @@
   "display": "standalone",
   "background_color": "#08081a",
   "theme_color": "#08081a",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "lang": "pt-BR",
   "categories": ["games", "puzzle", "entertainment"],
   "icons": [
