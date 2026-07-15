@@ -11,7 +11,7 @@ createRoot(document.getElementById('root')!).render(
 
 // Register PWA Service Worker
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  const register = () => {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('LogicMatch PWA Service Worker registered successfully with scope:', registration.scope);
@@ -19,6 +19,12 @@ if ('serviceWorker' in navigator) {
       .catch((error) => {
         console.error('LogicMatch PWA Service Worker registration failed:', error);
       });
-  });
+  };
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    register();
+  } else {
+    window.addEventListener('load', register);
+  }
 }
 

@@ -1395,6 +1395,32 @@ export default function App() {
                 </ol>
               </div>
             )}
+
+            {/* Android / Desktop Install Guide (Shown when not standalone and not iOS) */}
+            {!isIOS && !isStandalone && (
+              <div
+                id="android-desktop-install-banner"
+                className={`p-4 rounded-2xl border flex flex-col gap-2 mt-2 text-xs text-left animate-fadeIn ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}
+              >
+                <div className="flex items-center gap-2 font-bold text-emerald-500">
+                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+                  <span>Instalar Aplicativo Oficial (PWA)</span>
+                </div>
+                <p className="opacity-80 leading-relaxed text-[11px]">
+                  Para jogar em tela cheia (como aplicativo nativo), sem barras de navegação e com desempenho 100% offline:
+                </p>
+                <div className="space-y-1.5 text-[11px] opacity-90 pl-1">
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-bold shrink-0">Opção 1:</span>
+                    <span>Se o botão <span className="font-bold text-emerald-400">"Instalar Aplicativo"</span> estiver ativo acima, basta clicar nele!</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-bold shrink-0">Opção 2:</span>
+                    <span>No seu navegador (Chrome, Edge ou Opera), abra o menu de opções (<span className="font-bold text-emerald-400">⋮</span> ou <span className="font-bold text-emerald-400">☰</span>) e clique em <span className="font-bold text-emerald-400">"Instalar aplicativo"</span> ou <span className="font-bold text-emerald-400">"Adicionar à tela de início"</span>.</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
