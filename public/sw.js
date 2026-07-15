@@ -49,7 +49,8 @@ self.addEventListener('fetch', (event) => {
   if (!url.protocol.startsWith('http') || url.origin !== self.location.origin) return;
 
   // Navigation requests (HTML pages) -> Network-First
-  if (event.request.mode === 'navigate' || event.request.headers.get('accept').includes('text/html')) {
+  const acceptHeader = event.request.headers.get('accept');
+  if (event.request.mode === 'navigate' || (acceptHeader && acceptHeader.includes('text/html'))) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {

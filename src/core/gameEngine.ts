@@ -516,7 +516,25 @@ export const GameEngine = {
       if (!blocked) return true;
     }
 
-    // 3. Linear wrapping check (no active cells in 1D array between minIdx and maxIdx)
+    // 3. Diagonal check (same diagonal, all cells in between must be removed)
+    if (Math.abs(r1 - r2) === Math.abs(c1 - c2)) {
+      const rowStep = r2 > r1 ? 1 : -1;
+      const colStep = c2 > c1 ? 1 : -1;
+      const steps = Math.abs(r1 - r2);
+      let blocked = false;
+      for (let i = 1; i < steps; i++) {
+        const r = r1 + i * rowStep;
+        const c = c1 + i * colStep;
+        const idx = r * cols + c;
+        if (!cells[idx].removed) {
+          blocked = true;
+          break;
+        }
+      }
+      if (!blocked) return true;
+    }
+
+    // 4. Linear wrapping check (no active cells in 1D array between minIdx and maxIdx)
     let blocked1D = false;
     for (let i = minIdx + 1; i < maxIdx; i++) {
       if (!cells[i].removed) {
