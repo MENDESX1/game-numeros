@@ -171,11 +171,27 @@ export default function App() {
       setDeferredPrompt(e);
       setIsInstallable(true);
     };
+
+    const handleCustomInstallable = () => {
+      const globalPrompt = (window as any).deferredPrompt;
+      if (globalPrompt) {
+        setDeferredPrompt(globalPrompt);
+        setIsInstallable(true);
+      }
+    };
+
+    // Check if prompt was already captured by index.html before React mounted
+    if ((window as any).deferredPrompt) {
+      handleCustomInstallable();
+    }
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-installable', handleCustomInstallable);
 
     // PWA: Listen for successful installation
     const handleAppInstalled = () => {
       setDeferredPrompt(null);
+      (window as any).deferredPrompt = null;
       setIsInstallable(false);
       showToast(config.language === 'pt' ? 'Aplicativo instalado com sucesso na sua grade de aplicativos!' : 'Application successfully installed on your app grid!', 'success');
     };
@@ -190,6 +206,7 @@ export default function App() {
       window.removeEventListener('click', handleFirstTouch);
       window.removeEventListener('touchstart', handleFirstTouch);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-installable', handleCustomInstallable);
       window.removeEventListener('appinstalled', handleAppInstalled);
       SynthAudio.stopMusic();
     };

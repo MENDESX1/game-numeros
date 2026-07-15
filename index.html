@@ -73,6 +73,15 @@
       }
     }
     </script>
+    <!-- Global capture for PWA install prompt to prevent React race conditions -->
+    <script>
+      window.deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-installable'));
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
