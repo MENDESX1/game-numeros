@@ -476,6 +476,7 @@ export const GameEngine = {
   // Main adjacency algorithm: horizontal, vertical, or continuous 1D wrapping pathfinding
   checkAdjacent(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
     if (idxA === idxB) return false;
+    if (!cells[idxA] || !cells[idxB]) return false;
     if (cells[idxA].removed || cells[idxB].removed) return false;
 
     const minIdx = Math.min(idxA, idxB);
@@ -493,7 +494,7 @@ export const GameEngine = {
       let blocked = false;
       for (let c = minCol + 1; c < maxCol; c++) {
         const idx = r1 * cols + c;
-        if (!cells[idx].removed) {
+        if (cells[idx] && !cells[idx].removed) {
           blocked = true;
           break;
         }
@@ -508,7 +509,7 @@ export const GameEngine = {
       let blocked = false;
       for (let r = minRow + 1; r < maxRow; r++) {
         const idx = r * cols + c1;
-        if (!cells[idx].removed) {
+        if (cells[idx] && !cells[idx].removed) {
           blocked = true;
           break;
         }
@@ -526,7 +527,7 @@ export const GameEngine = {
         const r = r1 + i * rowStep;
         const c = c1 + i * colStep;
         const idx = r * cols + c;
-        if (!cells[idx].removed) {
+        if (cells[idx] && !cells[idx].removed) {
           blocked = true;
           break;
         }
@@ -537,7 +538,7 @@ export const GameEngine = {
     // 4. Linear wrapping check (no active cells in 1D array between minIdx and maxIdx)
     let blocked1D = false;
     for (let i = minIdx + 1; i < maxIdx; i++) {
-      if (!cells[i].removed) {
+      if (cells[i] && !cells[i].removed) {
         blocked1D = true;
         break;
       }
@@ -765,6 +766,19 @@ export const GameEngine = {
         removed: false
       });
     });
+
+    // Pad to a multiple of cols to ensure perfect 2D grid alignment and prevent rendering glitches or out-of-bounds math issues
+    while (nextCells.length % cols !== 0) {
+      nextCells.push({
+        id: `empty-pad-${this.generateId()}`,
+        value: 0,
+        special: 'none',
+        frozenCount: 0,
+        locked: false,
+        multiplier: 1,
+        removed: true
+      });
+    }
 
     return nextCells;
   },
