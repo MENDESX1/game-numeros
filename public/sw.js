@@ -68,8 +68,6 @@ self.addEventListener('fetch', (event) => {
             });
           }
           return networkResponse;
-        }).catch(() => {
-          // If offline and not in cache, fail gracefully
         });
       })
     );
@@ -94,7 +92,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          return caches.match(event.request).then((cachedResponse) => {
+          return caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
             return cachedResponse || caches.match(OFFLINE_URL) || caches.match('/');
           });
         })
@@ -104,7 +102,7 @@ self.addEventListener('fetch', (event) => {
 
   // 4. Static assets (CSS, JS, Images, JSON) -> Stale-While-Revalidate
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
@@ -113,11 +111,17 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // Offline: just let stale-while-revalidate fail silently if not cached
       });
 
-      return cachedResponse || fetchPromise;
+      if (cachedResponse) {
+        // Prevent background-sync failures from throwing unhandled rejections
+        fetchPromise.catch(() => { /* Silent background catch */ });
+        return cachedResponse;
+      }
+
+      // Return the fetch promise directly without a swallowing catch.
+      // This will throw a standard network error when offline, which Chrome expects.
+      return fetchPromise;
     })
   );
 });
