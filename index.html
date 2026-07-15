@@ -11,7 +11,7 @@
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" as="style" />
     
     <!-- PWA Config -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/manifest.json" type="application/manifest+json" />
     <meta name="theme-color" content="#08081a" />
     <meta name="description" content="LogicMatch é um viciante jogo de lógica e números com blocos especiais, desafios progressivos e múltiplos modos. Teste seu raciocínio lógico!" />
     <meta name="keywords" content="jogo de lógica, puzzle numérico, logic match, jogos de matemática, quebra-cabeça, desafios cognitivos, jogos mobile" />
@@ -44,7 +44,7 @@
     <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
     
     <!-- Favicon fallback -->
-    <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     
     <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9840069917467020"
@@ -81,6 +81,15 @@
         window.deferredPrompt = e;
         window.dispatchEvent(new CustomEvent('pwa-installable'));
       });
+    </script>
+      <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js")
+            .then((reg) => console.log("SW registered", reg))
+            .catch((err) => console.error("SW reg failed", err));
+        });
+      }
     </script>
   </head>
   <body>
