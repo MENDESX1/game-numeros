@@ -1,4 +1,4 @@
-import { GameConfig, UserStats, UserProfile, Achievement, GameMission, GameMode } from '../types';
+import { GameConfig, UserStats, UserProfile, Achievement, GameMission } from '../types';
 import { DEFAULT_ACHIEVEMENTS, getMissions } from '../config/gameConfig';
 
 const STORAGE_KEYS = {
@@ -61,6 +61,89 @@ const DEFAULT_PROFILE: UserProfile = {
   unlockedFrames: ['fr_1']
 };
 
+const DB_NAME = 'LogicMatchDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'game_store';
+
+function getIDBConnection(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export const IndexedDBBridge = {
+  async get(key: string): Promise<any> {
+    try {
+      const db = await getIDBConnection();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('IndexedDB get error for key:', key, e);
+      return null;
+    }
+  },
+
+  async set(key: string, val: any): Promise<void> {
+    try {
+      const db = await getIDBConnection();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.put(val, key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('IndexedDB set error for key:', key, e);
+    }
+  },
+
+  async loadAllToLocalStorage(): Promise<void> {
+    try {
+      const keys = Object.values(STORAGE_KEYS);
+      for (const key of keys) {
+        const val = await this.get(key);
+        if (val !== undefined && val !== null) {
+          localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+        }
+      }
+    } catch (e) {
+      console.error('Error loading IndexedDB to LocalStorage:', e);
+    }
+  },
+
+  async saveAllFromLocalStorage(): Promise<void> {
+    try {
+      const keys = Object.values(STORAGE_KEYS);
+      for (const key of keys) {
+        const val = localStorage.getItem(key);
+        if (val !== null) {
+          try {
+            await this.set(key, JSON.parse(val));
+          } catch {
+            await this.set(key, val);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error saving LocalStorage to IndexedDB:', e);
+    }
+  }
+};
+
 export const GameStorage = {
   getConfig(): GameConfig {
     const data = localStorage.getItem(STORAGE_KEYS.CONFIG);
@@ -69,6 +152,7 @@ export const GameStorage = {
 
   saveConfig(config: GameConfig) {
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
+    IndexedDBBridge.set(STORAGE_KEYS.CONFIG, config);
   },
 
   getStats(): UserStats {
@@ -78,6 +162,7 @@ export const GameStorage = {
 
   saveStats(stats: UserStats) {
     localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
+    IndexedDBBridge.set(STORAGE_KEYS.STATS, stats);
   },
 
   getProfile(): UserProfile {
@@ -87,6 +172,7 @@ export const GameStorage = {
 
   saveProfile(profile: UserProfile) {
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    IndexedDBBridge.set(STORAGE_KEYS.PROFILE, profile);
   },
 
   getAchievements(): Achievement[] {
@@ -103,6 +189,7 @@ export const GameStorage = {
 
   saveAchievements(achievements: Achievement[]) {
     localStorage.setItem(STORAGE_KEYS.ACHIEVEMENTS, JSON.stringify(achievements));
+    IndexedDBBridge.set(STORAGE_KEYS.ACHIEVEMENTS, achievements);
   },
 
   getMissions(): GameMission[] {
@@ -115,6 +202,8 @@ export const GameStorage = {
       const freshMissions = getMissions(todayStr);
       localStorage.setItem(STORAGE_KEYS.MISSIONS_DATE, todayStr);
       localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(freshMissions));
+      IndexedDBBridge.set(STORAGE_KEYS.MISSIONS_DATE, todayStr);
+      IndexedDBBridge.set(STORAGE_KEYS.MISSIONS, freshMissions);
       return freshMissions;
     }
 
@@ -123,6 +212,7 @@ export const GameStorage = {
 
   saveMissions(missions: GameMission[]) {
     localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(missions));
+    IndexedDBBridge.set(STORAGE_KEYS.MISSIONS, missions);
   },
 
   updateMissionProgress(missionId: string, increment: number): { completedJustNow: boolean, mission: GameMission } | null {
@@ -241,6 +331,11 @@ export const GameStorage = {
     localStorage.removeItem(STORAGE_KEYS.ACHIEVEMENTS);
     localStorage.removeItem(STORAGE_KEYS.MISSIONS);
     localStorage.removeItem(STORAGE_KEYS.MISSIONS_DATE);
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
+    
+    Object.values(STORAGE_KEYS).forEach(key => {
+      IndexedDBBridge.set(key, null);
+    });
   },
 
   exportData(): string {
@@ -270,6 +365,14 @@ export const GameStorage = {
         if (parsed.missionsDate) {
           localStorage.setItem(STORAGE_KEYS.MISSIONS_DATE, parsed.missionsDate);
         }
+        
+        this.saveConfig(parsed.config);
+        this.saveStats(parsed.stats);
+        this.saveProfile(parsed.profile);
+        this.saveAchievements(parsed.achievements);
+        if (parsed.missions) this.saveMissions(parsed.missions);
+        if (parsed.missionsDate) IndexedDBBridge.set(STORAGE_KEYS.MISSIONS_DATE, parsed.missionsDate);
+
         return true;
       }
     } catch (e) {
@@ -285,9 +388,11 @@ export const GameStorage = {
   
   saveActiveGame(state: any) {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_GAME, JSON.stringify(state));
+    IndexedDBBridge.set(STORAGE_KEYS.ACTIVE_GAME, state);
   },
   
   clearActiveGame() {
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
+    IndexedDBBridge.set(STORAGE_KEYS.ACTIVE_GAME, null);
   }
 };

@@ -1,3 +1,4 @@
+import { PathFinder } from "./pathFinder";
 import { Cell, CellSpecial, GameMode, Difficulty } from '../types';
 
 export const GameEngine = {
@@ -563,7 +564,7 @@ export const GameEngine = {
         if (cells[idxB].locked) continue;
 
         if (this.isMatchable(cells[idxA].value, cells[idxB].value)) {
-          if (this.checkAdjacent(idxA, idxB, cells, cols)) {
+          if (this.checkAdjacent(idxA, idxB, cells, cols) || PathFinder.findPath(idxA, idxB, cells, cols)) {
             matches.push([idxA, idxB]);
           }
         }

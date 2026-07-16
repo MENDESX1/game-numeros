@@ -2,14 +2,16 @@ import { useState, useEffect, useRef } from 'react';
 import { GameMode, Difficulty, Cell, UserProfile, UserStats, GameConfig, GameMission, Achievement } from './types';
 import { THEMES, TRANSLATIONS, DEFAULT_ACHIEVEMENTS } from './config/gameConfig';
 import { GameEngine } from './core/gameEngine';
+import { PathFinder } from "./core/pathFinder";
 import { GameStorage } from './storage/db';
+import { HistorySystem } from "./core/historySystem";
 import { SynthAudio } from './audio/synth';
 
 // Icons
 import {
   Play, Settings, Trophy, ShoppingBag, Target, BarChart3, ChevronLeft,
   Plus, Lightbulb, Clock, Flame, Coins, Crown, Sparkles, AlertCircle,
-  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Heart, Infinity
+  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Undo2, Heart, Infinity
 } from 'lucide-react';
 
 // Components
@@ -36,7 +38,6 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
-  const [showIOSInstallGuide, setShowIOSInstallGuide] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false);
@@ -141,6 +142,8 @@ export default function App() {
   const isResumingRef = useRef(false);
 
   // Ref tracking for active gameplay timing
+  const historyRef = useRef(new HistorySystem());
+  const [canUndoState, setCanUndoState] = useState(false);
   const gameIntervalRef = useRef<any>(null);
   const comboTimeoutRef = useRef<any>(null);
   const fpsFrameRef = useRef<number>(0);
@@ -327,7 +330,7 @@ export default function App() {
     SynthAudio.playClick(config.soundEnabled);
     if (!deferredPrompt) {
       if (isIOS && !isStandalone) {
-        setShowIOSInstallGuide(true);
+        showToast(config.language === 'pt' ? 'Para instalar no iOS, toque em Compartilhar e "Adicionar à Tela de Início".' : 'To install on iOS, tap Share and "Add to Home Screen".', 'info');
       } else if (isStandalone) {
         showToast(config.language === 'pt' ? 'Aplicativo já está instalado e rodando em modo standalone!' : 'App is already installed and running in standalone mode!', 'info');
       } else {
@@ -395,10 +398,13 @@ export default function App() {
       if (isPaused) return;
       
       // 1. Time tracking in stats
-      const nextStats = { ...stats };
-      nextStats.totalTimePlayed += 1;
-      setStats(nextStats);
-      GameStorage.saveStats(nextStats);
+      setStats(prevStats => {
+        const nextStats = { ...prevStats, totalTimePlayed: prevStats.totalTimePlayed + 1 };
+        if (nextStats.totalTimePlayed % 10 === 0) {
+          GameStorage.saveStats(nextStats);
+        }
+        return nextStats;
+      });
 
       // 2. Timed Mode logic
       if (mode === 'timed' || (levelId && CHALLENGE_LEVELS.find(l => l.id === levelId)?.timeLimit)) {
@@ -512,6 +518,8 @@ export default function App() {
 
   // Start a new match
   const startNewGame = (selectedMode: GameMode, selectedDiff: Difficulty, challengeId: number | null = null) => {
+    historyRef.current.clear();
+    setCanUndoState(false);
     GameStorage.clearActiveGame();
     setActiveSavedGame(null);
     SynthAudio.playClick(config.soundEnabled);
@@ -610,6 +618,36 @@ export default function App() {
     if (lvlId === 3 || lvlId === 8) return 'bombs';
     return 'classic';
   };
+
+  
+  const saveHistory = () => {
+    historyRef.current.saveState({
+      cells: JSON.parse(JSON.stringify(cells)),
+      score,
+      combo,
+      linesAddedCount,
+      shufflesLeft,
+      hintsLeft
+    });
+    setCanUndoState(historyRef.current.canUndo());
+  };
+
+
+  const handleUndo = () => {
+    if (!historyRef.current.canUndo()) return;
+    const previousState = historyRef.current.undo();
+    if (previousState) {
+      setCells(previousState.cells);
+      setScore(previousState.score);
+      setCombo(previousState.combo);
+      setLinesAddedCount(previousState.linesAddedCount);
+      setShufflesLeft(previousState.shufflesLeft);
+      setHintsLeft(previousState.hintsLeft);
+      setCanUndoState(historyRef.current.canUndo());
+      SynthAudio.playClick(config.soundEnabled);
+    }
+  };
+
 
   const handleGameOver = () => {
     setGameOver(true);
@@ -838,13 +876,14 @@ export default function App() {
       const cellB = cells[idx];
 
       const isMatchable = GameEngine.isMatchable(cellA.value, cellB.value);
-      const isAdjacent = GameEngine.checkAdjacent(selectedIndex, idx, cells, cols);
+      const isAdjacent = GameEngine.checkAdjacent(selectedIndex, idx, cells, cols) || PathFinder.findPath(selectedIndex, idx, cells, cols);
 
       if (isMatchable && isAdjacent) {
         // Valid Match!
         const firstIdx = selectedIndex; // Store local reference
         setSelectedIndex(null); // Clear selectedIndex immediately to prevent double-matching/selection!
 
+        saveHistory();
         // Start glide visual approximation animation
         const r1 = Math.floor(firstIdx / cols);
         const c1 = firstIdx % cols;
@@ -1088,7 +1127,7 @@ export default function App() {
         }
 
         const prevSelectedIndex = selectedIndex;
-        setSelectedIndex(null); // Clear selectedIndex immediately so user can select another cell right away
+        setSelectedIndex(idx); // Trocar a seleção para o novo número, conforme regra.
 
         // Set invalid match state to show shaking red cells and error explanation
         setInvalidMatch({ idxA: prevSelectedIndex, idxB: idx, message: explanation });
@@ -1118,6 +1157,7 @@ export default function App() {
 
   // Append duplicates helper (when player gets stuck)
   const handleAddNumbers = () => {
+    saveHistory();
     SynthAudio.playClick(config.soundEnabled);
     const nextCells = GameEngine.addNumbers(cells, cols);
     setCells(nextCells);
@@ -1142,6 +1182,7 @@ export default function App() {
 
   // Shuffle powerup
   const handleShuffle = () => {
+    saveHistory();
     if (shufflesLeft <= 0 && mode !== 'relax') {
       showToast(config.language === 'pt' ? 'Sem embaralhamentos restantes!' : config.language === 'es' ? '¡Sin barajas restantes!' : 'No shuffles remaining!', 'error');
       return;
@@ -1470,58 +1511,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* iOS Safari Install Guide (Only shown on iOS when not installed) */}
-            {isIOS && !isStandalone && (
-              <div
-                id="ios-install-banner"
-                className={`p-4 rounded-2xl border flex flex-col gap-2 mt-2 text-xs text-left animate-fadeIn ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}
-              >
-                <div className="flex items-center gap-2 font-bold text-sky-500">
-                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                  <span>Instalar no iPhone / iPad</span>
-                </div>
-                <p className="opacity-80 leading-relaxed text-[11px]">
-                  Jogue em tela cheia e offline adicionando o jogo à sua tela de início:
-                </p>
-                <ol className="list-decimal list-inside space-y-1 opacity-90 pl-1 text-[11px]">
-                  <li>
-                    Toque no ícone de <span className="font-bold underline text-sky-400">Compartilhar</span> na barra do Safari (ícone <span className="inline-block bg-white/10 px-1 py-0.5 rounded text-[10px]">📤</span>).
-                  </li>
-                  <li>
-                    Role para baixo e selecione <span className="font-bold underline text-sky-400">"Adicionar à Tela de Início"</span> (ícone <span className="inline-block bg-white/10 px-1.5 py-0.5 rounded text-[10px] font-mono">+</span>).
-                  </li>
-                  <li>
-                    Abra o app direto de sua tela de início para jogar sem barras e 100% offline!
-                  </li>
-                </ol>
-              </div>
-            )}
 
-            {/* Android / Desktop Install Guide (Shown when not standalone and not iOS) */}
-            {!isIOS && !isStandalone && (
-              <div
-                id="android-desktop-install-banner"
-                className={`p-4 rounded-2xl border flex flex-col gap-2 mt-2 text-xs text-left animate-fadeIn ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}
-              >
-                <div className="flex items-center gap-2 font-bold text-emerald-500">
-                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                  <span>Instalar Aplicativo Oficial (PWA)</span>
-                </div>
-                <p className="opacity-80 leading-relaxed text-[11px]">
-                  Para jogar em tela cheia (como aplicativo nativo), sem barras de navegação e com desempenho 100% offline:
-                </p>
-                <div className="space-y-1.5 text-[11px] opacity-90 pl-1">
-                  <div className="flex items-start gap-1.5">
-                    <span className="font-bold shrink-0">Opção 1:</span>
-                    <span>Se o botão <span className="font-bold text-emerald-400">"Instalar Aplicativo"</span> estiver ativo acima, basta clicar nele!</span>
-                  </div>
-                  <div className="flex items-start gap-1.5">
-                    <span className="font-bold shrink-0">Opção 2:</span>
-                    <span>No seu navegador (Chrome, Edge ou Opera), abra o menu de opções (<span className="font-bold text-emerald-400">⋮</span> ou <span className="font-bold text-emerald-400">☰</span>) e clique em <span className="font-bold text-emerald-400">"Instalar aplicativo"</span> ou <span className="font-bold text-emerald-400">"Adicionar à tela de início"</span>.</span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1609,6 +1599,17 @@ export default function App() {
                   >
                     <Plus className="w-4 h-4" />
                     <span>{t.add_numbers}</span>
+                  </button>
+
+                  
+                  <button
+                    id="powerup-undo-btn"
+                    onClick={handleUndo}
+                    disabled={!canUndoState}
+                    className={`flex items-center gap-1.5 py-2 px-3.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${canUndoState ? activeTheme.secondaryBtn : 'opacity-50 cursor-not-allowed bg-gray-800 text-gray-500'}`}
+                  >
+                    <Undo2 className="w-4 h-4 text-blue-400" />
+                    <span className="hidden sm:inline">{config.language === 'pt' ? 'Desfazer' : config.language === 'es' ? 'Deshacer' : 'Undo'}</span>
                   </button>
 
                   <button

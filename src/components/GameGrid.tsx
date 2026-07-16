@@ -25,7 +25,7 @@ interface GameGridProps {
   isShuffling?: boolean;
 }
 
-export const GameGrid: React.FC<GameGridProps> = ({
+export const GameGrid: React.FC<GameGridProps> = React.memo(({
   cells,
   cols,
   selectedIndex,
@@ -309,4 +309,17 @@ export const GameGrid: React.FC<GameGridProps> = ({
       </div>
     </div>
   );
-};
+}, (prev, next) => {
+  return (
+    prev.cells === next.cells &&
+    prev.selectedIndex === next.selectedIndex &&
+    prev.highlightedIndices === next.highlightedIndices &&
+    prev.errorIndices.length === next.errorIndices.length &&
+    prev.animatingMatch === next.animatingMatch &&
+    prev.activeExplosions === next.activeExplosions &&
+    prev.floatingScores === next.floatingScores &&
+    prev.isShuffling === next.isShuffling &&
+    prev.config.highContrast === next.config.highContrast &&
+    prev.themeStyles === next.themeStyles
+  );
+});
