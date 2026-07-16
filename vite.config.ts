@@ -12,6 +12,9 @@ export default defineConfig(() => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'favicon.png', 'icons/icon-192x192.png', 'icons/icon-512x512.png', 'screenshots/desktop.png', 'screenshots/mobile.png'],
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,txt,json}']
+        },
         manifest: {
           name: "LogicMatch - Puzzle Numérico",
           short_name: "LogicMatch",
