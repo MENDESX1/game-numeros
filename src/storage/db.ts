@@ -223,7 +223,11 @@ export const GameStorage = {
     const m = missions[index];
     if (m.completed) return null;
 
-    m.currentValue = Math.min(m.targetValue, m.currentValue + increment);
+    if (missionId === 'daily_score' || missionId === 'weekly_combos') {
+      m.currentValue = Math.min(m.targetValue, Math.max(m.currentValue, increment));
+    } else {
+      m.currentValue = Math.min(m.targetValue, m.currentValue + increment);
+    }
     let completedJustNow = false;
     if (m.currentValue >= m.targetValue && !m.completed) {
       m.completed = true;
@@ -232,6 +236,14 @@ export const GameStorage = {
       const profile = this.getProfile();
       profile.coins += m.rewardCoins;
       this.addXP(m.rewardXP, profile);
+
+      // Track lifetime coins in stats
+      const stats = this.getStats();
+      stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + m.rewardCoins;
+      this.saveStats(stats);
+      
+      // Force checking coin achievements since totalCoinsEarned increased
+      this.updateAchievementProgress('coins', profile.coins);
     }
 
     this.saveMissions(missions);
@@ -241,6 +253,7 @@ export const GameStorage = {
   updateAchievementProgress(category: Achievement['category'] | 'all', value: number, actionType?: string): { completedTitle: string; coinsReward: number }[] {
     const achievements = this.getAchievements();
     const profile = this.getProfile();
+    const stats = this.getStats();
     const completedList: { completedTitle: string; coinsReward: number }[] = [];
 
     const updated = achievements.map(ach => {
@@ -261,17 +274,26 @@ export const GameStorage = {
       }
 
       if (shouldUpdate) {
-        ach.currentValue = value;
+        if (actionType === 'ice' || actionType === 'lock' || actionType === 'bomb') {
+          ach.currentValue = (ach.currentValue || 0) + value;
+        } else if (ach.category === 'coins') {
+          // Track cumulative lifetime coins earned instead of current wallet coins
+          ach.currentValue = stats.totalCoinsEarned || 0;
+        } else {
+          ach.currentValue = value;
+        }
         if (ach.currentValue >= ach.targetValue) {
           ach.completed = true;
           ach.unlockedAt = new Date().toISOString();
           profile.coins += ach.rewardCoins;
+          stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + ach.rewardCoins;
           completedList.push({ completedTitle: ach.titleKey, coinsReward: ach.rewardCoins });
         }
       }
       return ach;
     });
 
+    this.saveStats(stats);
     this.saveAchievements(updated);
     this.saveProfile(profile);
     return completedList;
@@ -336,6 +358,24 @@ export const GameStorage = {
     Object.values(STORAGE_KEYS).forEach(key => {
       IndexedDBBridge.set(key, null);
     });
+
+    // Clear caches if available in browser
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        for (const name of names) {
+          caches.delete(name);
+        }
+      }).catch(err => console.error('Cache deletion failed:', err));
+    }
+
+    // Unregister service workers if available
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (const registration of registrations) {
+          registration.unregister();
+        }
+      }).catch(err => console.error('Service worker unregistration failed:', err));
+    }
   },
 
   exportData(): string {

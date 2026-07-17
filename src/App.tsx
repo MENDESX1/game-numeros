@@ -468,7 +468,7 @@ export default function App() {
 
   // Handle Level XP and Profile state updates
   const handleXPAdd = (amount: number) => {
-    const res = GameStorage.addXP(amount, profile);
+    const res = GameStorage.addXP(amount);
     const updated = GameStorage.getProfile();
     setProfile(updated);
     
@@ -786,11 +786,18 @@ export default function App() {
     setProfile(nextProfile);
     GameStorage.saveProfile(nextProfile);
 
+    // Save totalCoinsEarned statistic
+    const updatedStats = { ...nextStats, totalCoinsEarned: (nextStats.totalCoinsEarned || 0) + coinReward };
+    setStats(updatedStats);
+    GameStorage.saveStats(updatedStats);
+
+    GameStorage.updateMissionProgress('weekly_coins', coinReward);
+
     handleXPAdd(xpReward);
 
     // Achievements trigger with computed final score
     GameStorage.updateAchievementProgress('score', computedFinalScore);
-    GameStorage.updateAchievementProgress('games', nextStats.totalMatches);
+    GameStorage.updateAchievementProgress('games', updatedStats.totalMatches);
     GameStorage.updateAchievementProgress('coins', nextProfile.coins);
     
     if (difficulty === 'insane') {
@@ -801,6 +808,9 @@ export default function App() {
     const m1 = GameStorage.updateMissionProgress('daily_score', computedFinalScore);
     const m2 = GameStorage.updateMissionProgress('daily_games', 1);
     setMissions(GameStorage.getMissions());
+
+    // Final profile reload to fetch rewards earned from mission and achievement completions
+    setProfile(GameStorage.getProfile());
   };
 
   // Check if any moves are available with proactive, Zen-flow auto-reorganization
@@ -924,6 +934,15 @@ export default function App() {
           const updatedProfile = { ...profile, coins: profile.coins + 2 };
           setProfile(updatedProfile);
           GameStorage.saveProfile(updatedProfile);
+
+          const nextStats = { ...stats };
+          nextStats.totalCoinsEarned = (nextStats.totalCoinsEarned || 0) + 2;
+          setStats(nextStats);
+          GameStorage.saveStats(nextStats);
+
+          GameStorage.updateMissionProgress('weekly_coins', 2);
+          GameStorage.updateAchievementProgress('coins', updatedProfile.coins);
+          setProfile(GameStorage.getProfile());
         }
 
         const matchBase = cellA.value;
@@ -951,16 +970,17 @@ export default function App() {
         if (result.isBombTriggered) {
           SynthAudio.playExplosion(config.soundEnabled);
           setClearedBombs(prev => prev + 1);
-          GameStorage.updateAchievementProgress('special', stats.totalClearedPieces + 1, 'bomb');
+          GameStorage.updateAchievementProgress('special', 1, 'bomb');
+          GameStorage.updateMissionProgress('weekly_bombs', 1);
           showToast('💣 BOMBA DETONADA COM SUCESSO! +150 PTS +2 MOEDAS', 'success');
         } else if (result.isIceBroken) {
           SynthAudio.playIceBreak(config.soundEnabled);
           setClearedIce(prev => prev + 1);
-          GameStorage.updateAchievementProgress('special', stats.totalClearedPieces + 1, 'ice');
+          GameStorage.updateAchievementProgress('special', 1, 'ice');
         } else if (result.isLockOpened) {
           SynthAudio.playUnlock(config.soundEnabled);
           setClearedLocks(prev => prev + 1);
-          GameStorage.updateAchievementProgress('special', stats.totalClearedPieces + 1, 'lock');
+          GameStorage.updateAchievementProgress('special', 1, 'lock');
         } else {
           SynthAudio.playMatch(config.soundEnabled, combo);
         }
@@ -974,6 +994,7 @@ export default function App() {
             setStats(nextStats);
             GameStorage.saveStats(nextStats);
           }
+          GameStorage.updateMissionProgress('weekly_combos', nextCombo);
           return nextCombo;
         });
 
@@ -1052,6 +1073,7 @@ export default function App() {
               }
 
               SynthAudio.playExplosion(config.soundEnabled);
+              GameStorage.updateMissionProgress('weekly_bombs', bombsDetonatedCount);
 
               explodedByBombs.forEach(eIdx => {
                 const bombExplosionId = Math.random().toString();
@@ -1091,6 +1113,9 @@ export default function App() {
 
           // Check for locked state (no more moves)
           checkBoardLock(cleanedCells, cols);
+
+          // Sync profile to load any completed mission / achievement rewards
+          setProfile(GameStorage.getProfile());
         }, 280);
 
         // Clean up visual overlays
@@ -1851,6 +1876,15 @@ export default function App() {
                 nextProfile.coins += 100; // Gift!
                 setProfile(nextProfile);
                 GameStorage.saveProfile(nextProfile);
+
+                const nextStats = { ...stats };
+                nextStats.totalCoinsEarned = (nextStats.totalCoinsEarned || 0) + 100;
+                setStats(nextStats);
+                GameStorage.saveStats(nextStats);
+
+                GameStorage.updateAchievementProgress('coins', nextProfile.coins);
+                setProfile(GameStorage.getProfile());
+
                 setShowLevelUp(false);
                 SynthAudio.playCoin(config.soundEnabled);
               }}
@@ -1872,6 +1906,7 @@ export default function App() {
           }}
           onResetData={() => {
             GameStorage.clearAllData();
+            window.location.reload();
           }}
           onExportData={() => {
             return GameStorage.exportData();
