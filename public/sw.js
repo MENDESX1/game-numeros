@@ -1,4 +1,4 @@
-const CACHE_NAME = 'logicmatch-cache-v3';
+const CACHE_NAME = 'logicmatch-cache-v4';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -17,7 +17,13 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Precaching app shell...');
-      return cache.addAll(PRECACHE_ASSETS);
+      // Use individual caching promises so a single network/file error doesn't abort installation
+      const cachePromises = PRECACHE_ASSETS.map((url) => {
+        return cache.add(url).catch((err) => {
+          console.warn(`[Service Worker] Failed to precache asset ${url}:`, err);
+        });
+      });
+      return Promise.all(cachePromises);
     })
   );
 });
