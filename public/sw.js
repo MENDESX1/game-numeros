@@ -1,4 +1,4 @@
-const CACHE_NAME = 'logicmatch-cache-v1';
+const CACHE_NAME = 'logicmatch-cache-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -13,7 +13,7 @@ const PRECACHE_ASSETS = [
 
 // Install Event - Precache App Shell
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Force the waiting service worker to become active
+  self.skipWaiting(); // Force the waiting service worker to become active immediately
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Precaching app shell...');
@@ -40,67 +40,61 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Dynamic caching strategies
+// Handle skipWaiting messages from client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Fetch Event - Strategic Caching
 self.addEventListener('fetch', (event) => {
-  const requestUrl = new URL(event.request.url);
+  const request = event.request;
+  const requestUrl = new URL(request.url);
 
-  // Skip non-GET requests and external APIs/scripts except Google Fonts
-  if (event.request.method !== 'GET') return;
+  // Skip non-GET requests
+  if (request.method !== 'GET') return;
 
-  // 1. Navigation requests (HTML pages) - Network First, fallback to Cache
-  if (event.request.mode === 'navigate' || requestUrl.pathname === '/' || requestUrl.pathname.endsWith('.html')) {
+  // 1. Navigation requests (HTML pages) - Always Network-First to detect updates instantly, fallback to Cache
+  if (request.mode === 'navigate' || requestUrl.pathname === '/' || requestUrl.pathname.endsWith('.html')) {
     event.respondWith(
-      fetch(event.request)
+      fetch(request)
         .then((response) => {
-          // Clone response and save to cache
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          if (response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
           return response;
         })
         .catch(() => {
-          // If network fails, serve from cache
-          return caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) return cachedResponse;
-            // Fallback for offline navigation if not in cache
-            return caches.match('/index.html');
-          });
+          console.log('[Service Worker] Fetch failed, serving offline layout.');
+          return caches.match('/') || caches.match('/index.html');
         })
     );
     return;
   }
 
-  // 2. Static Assets (Hashed JS, CSS, PNGs, SVGs) - Cache First with Network Fallback
-  const isStaticAsset = 
-    requestUrl.pathname.includes('/assets/') || 
-    PRECACHE_ASSETS.includes(requestUrl.pathname) ||
-    /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff2|webp)$/i.test(requestUrl.pathname);
+  // 2. Pure Cache-First for static media, icons, and fonts (these do not change between versions, or are versioned)
+  const isMediaOrFont = 
+    /\.(png|jpg|jpeg|gif|svg|ico|webp|woff2|woff|ttf|otf|mp3|wav|ogg|m4a)$/i.test(requestUrl.pathname) ||
+    requestUrl.hostname.includes('fonts.gstatic.com') ||
+    requestUrl.hostname.includes('fonts.googleapis.com');
 
-  if (isStaticAsset) {
+  if (isMediaOrFont) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
+      caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Fetch in background to update cache (Stale-While-Revalidate)
-          fetch(event.request).then((networkResponse) => {
-            if (networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse);
-              });
-            }
-          }).catch(() => {/* Ignore background sync failure */});
-          
           return cachedResponse;
         }
-
-        return fetch(event.request).then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-            return networkResponse;
+        return fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
           }
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
           return networkResponse;
         });
       })
@@ -108,20 +102,41 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. General Requests (Default Network-First with Cache fallback)
+  // 3. Cache-First with Stale-While-Revalidate for JS/CSS assets (Hashed builds)
+  const isBuildAsset = requestUrl.pathname.includes('/assets/');
+  if (isBuildAsset) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        const fetchPromise = fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        }).catch(() => {/* Silent catch */});
+
+        return cachedResponse || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // 4. Default: Network-First with Cache fallback for general API requests or other assets
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
+            cache.put(request, responseToCache);
           });
         }
         return response;
       })
       .catch(() => {
-        return caches.match(event.request);
+        return caches.match(request);
       })
   );
 });
