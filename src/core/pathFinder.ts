@@ -146,6 +146,50 @@ export class PathFinder {
     }
     if (!isBlocked1D) return true;
 
+    // --- 5. 2D BFS Path Finder (Any multi-step path through empty/inactive cells) ---
+    // If there is ANY connected path of empty/removed/inactive cells between idxA and idxB,
+    // they are allowed to connect. Check all 8 directions (orthogonal + diagonal).
+    const numRows = Math.ceil(cells.length / cols);
+    const queue: number[] = [idxA];
+    const visited = new Set<number>([idxA]);
+    let foundPath = false;
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (current === idxB) {
+        foundPath = true;
+        break;
+      }
+
+      const r = Math.floor(current / cols);
+      const c = current % cols;
+
+      const directions = [
+        [-1, 0], [1, 0], [0, -1], [0, 1],       // Orthogonal
+        [-1, -1], [-1, 1], [1, -1], [1, 1]      // Diagonal
+      ];
+
+      for (const [dr, dc] of directions) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < numRows && nc >= 0 && nc < cols) {
+          const neighborIdx = nr * cols + nc;
+          if (neighborIdx < cells.length && !visited.has(neighborIdx)) {
+            // Can traverse if it is the target B OR if it is an empty/removed/inactive cell
+            if (neighborIdx === idxB || !this.isActive(cells[neighborIdx])) {
+              visited.add(neighborIdx);
+              queue.push(neighborIdx);
+            }
+          }
+        }
+      }
+    }
+
+    if (showDebugLogs) {
+      console.log(`  - Caminho Livre por Espaços Vazios (BFS): ${foundPath ? 'LIVRE' : 'BLOQUEADO'}`);
+    }
+    if (foundPath) return true;
+
     if (showDebugLogs) {
       console.log(`[PathFinder] Resultado: SEM CONEXÃO POSSÍVEL`);
     }
