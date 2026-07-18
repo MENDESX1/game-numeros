@@ -61,15 +61,24 @@ export class PathFinder {
     const r2 = Math.floor(maxIdx / cols);
     const c2 = maxIdx % cols;
 
+    if (showDebugLogs) {
+      console.log(`[PathFinder] Verificando conexão: A(idx:${idxA}, v:${cells[idxA].value}, r:${Math.floor(idxA / cols)}, c:${idxA % cols}) -> B(idx:${idxB}, v:${cells[idxB].value}, r:${Math.floor(idxB / cols)}, c:${idxB % cols})`);
+    }
+
     // --- 1. Same Row Check (Horizontal) ---
     if (r1 === r2) {
       let isBlocked = false;
+      let blockerInfo = '';
       for (let c = c1 + 1; c < c2; c++) {
         const checkIdx = r1 * cols + c;
         if (this.isActive(cells[checkIdx])) {
           isBlocked = true;
+          blockerInfo = `idx:${checkIdx}, v:${cells[checkIdx].value}`;
           break;
         }
+      }
+      if (showDebugLogs) {
+        console.log(`  - Caminho Horizontal: ${isBlocked ? `BLOQUEADO por ${blockerInfo}` : 'LIVRE'}`);
       }
       if (!isBlocked) return true;
     }
@@ -77,33 +86,61 @@ export class PathFinder {
     // --- 2. Same Column Check (Vertical) ---
     if (c1 === c2) {
       let isBlocked = false;
+      let blockerInfo = '';
       for (let r = r1 + 1; r < r2; r++) {
         const checkIdx = r * cols + c1;
         if (this.isActive(cells[checkIdx])) {
           isBlocked = true;
+          blockerInfo = `idx:${checkIdx}, v:${cells[checkIdx].value}`;
           break;
         }
+      }
+      if (showDebugLogs) {
+        console.log(`  - Caminho Vertical: ${isBlocked ? `BLOQUEADO por ${blockerInfo}` : 'LIVRE'}`);
       }
       if (!isBlocked) return true;
     }
 
-    // --- 3. Diagonal Adjacent Check (Only direct neighbors) ---
+    // --- 3. Diagonal Check (Neighbors or empty diagonals of any length) ---
     const rowDiff = Math.abs(r1 - r2);
     const colDiff = Math.abs(c1 - c2);
-    if (rowDiff === 1 && colDiff === 1) {
-      return true;
+    if (rowDiff === colDiff) {
+      let isBlocked = false;
+      let blockerInfo = '';
+      const dr = Math.sign(r2 - r1);
+      const dc = Math.sign(c2 - c1);
+      for (let step = 1; step < rowDiff; step++) {
+        const checkIdx = (r1 + step * dr) * cols + (c1 + step * dc);
+        if (this.isActive(cells[checkIdx])) {
+          isBlocked = true;
+          blockerInfo = `idx:${checkIdx}, v:${cells[checkIdx].value}`;
+          break;
+        }
+      }
+      if (showDebugLogs) {
+        console.log(`  - Caminho Diagonal (dist:${rowDiff}): ${isBlocked ? `BLOQUEADO por ${blockerInfo}` : 'LIVRE'}`);
+      }
+      if (!isBlocked) return true;
     }
 
     // --- 4. 1D Sequential / Wrapping Check ---
     let isBlocked1D = false;
+    let blockerInfo1D = '';
     for (let i = minIdx + 1; i < maxIdx; i++) {
       if (this.isActive(cells[i])) {
         isBlocked1D = true;
+        blockerInfo1D = `idx:${i}, v:${cells[i].value}`;
         break;
       }
     }
+    if (showDebugLogs) {
+      console.log(`  - Caminho 1D Sequencial: ${isBlocked1D ? `BLOQUEADO por ${blockerInfo1D}` : 'LIVRE'}`);
+    }
     if (!isBlocked1D) return true;
 
+    if (showDebugLogs) {
+      console.log(`[PathFinder] Resultado: SEM CONEXÃO POSSÍVEL`);
+    }
     return false;
   }
 
