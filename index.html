@@ -40,6 +40,13 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="LogicMatch">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    
     <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9840069917467020"
      crossorigin="anonymous"></script>
@@ -67,29 +74,16 @@
       }
     }
     </script>
-    <!-- Unregister all active service workers and clear browser caches immediately on load -->
+    
+    <!-- PWA Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          for (const registration of registrations) {
-            registration.unregister().then(() => {
-              console.log('[Cleanup] Service Worker unregistered successfully');
-            });
-          }
-        }).catch(err => {
-          console.error('[Cleanup] Service Worker unregistration failed:', err);
-        });
-      }
-
-      if ('caches' in window) {
-        caches.keys().then(names => {
-          for (const name of names) {
-            caches.delete(name).then(() => {
-              console.log('[Cleanup] Browser cache deleted:', name);
-            });
-          }
-        }).catch(err => {
-          console.error('[Cleanup] Cache deletion failed:', err);
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
         });
       }
     </script>

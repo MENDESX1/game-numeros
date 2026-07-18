@@ -1,0 +1,41 @@
+{
+  "background_color": "#ffffff",
+  "description": "LogicMatch é um viciante jogo de lógica e números com blocos especiais, desafios progressivos e múltiplos modos. Teste seu raciocínio lógico!",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "LogicMatch",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "LogicMatch",
+  "start_url": "/",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "type": "image/x-icon",
+      "sizes": "48x48"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "type": "image/png",
+      "sizes": "32x32"
+    },
+    {
+      "src": "/favicon-16x16.png",
+      "type": "image/png",
+      "sizes": "16x16"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}
