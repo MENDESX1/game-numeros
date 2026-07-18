@@ -102,20 +102,30 @@ export class PathFinder {
       if (!isBlocked) return true;
     }
 
-    // --- 3. Diagonal Check (Only direct adjacent diagonal neighbors are allowed) ---
+    // --- 3. Diagonal Check (Any length, must have no active cells on the path) ---
     const rowDiff = Math.abs(r1 - r2);
     const colDiff = Math.abs(c1 - c2);
     if (rowDiff === colDiff) {
-      if (rowDiff === 1) {
-        if (showDebugLogs) {
-          console.log(`  - Caminho Diagonal Adjacente (dist: 1): LIVRE`);
-        }
-        return true;
-      } else {
-        if (showDebugLogs) {
-          console.log(`  - Caminho Diagonal NÃO ADJACENTE (dist: ${rowDiff}): BLOQUEADO por regra (diagonais maiores que 1 não são permitidas)`);
+      let isBlocked = false;
+      const dr = r2 > r1 ? 1 : -1;
+      const dc = c2 > c1 ? 1 : -1;
+      let blockerInfo = '';
+      
+      for (let step = 1; step < rowDiff; step++) {
+        const r = r1 + step * dr;
+        const c = c1 + step * dc;
+        const checkIdx = r * cols + c;
+        if (this.isActive(cells[checkIdx])) {
+          isBlocked = true;
+          blockerInfo = `idx:${checkIdx}, v:${cells[checkIdx].value}`;
+          break;
         }
       }
+      
+      if (showDebugLogs) {
+        console.log(`  - Caminho Diagonal (comprimento ${rowDiff}): ${isBlocked ? `BLOQUEADO por ${blockerInfo}` : 'LIVRE'}`);
+      }
+      if (!isBlocked) return true;
     }
 
     // --- 4. 1D Sequential / Wrapping Check ---
