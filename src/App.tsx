@@ -886,7 +886,7 @@ export default function App() {
       const cellB = cells[idx];
 
       const isMatchable = GameEngine.isMatchable(cellA.value, cellB.value);
-      const isAdjacent = GameEngine.checkAdjacent(selectedIndex, idx, cells, cols);
+      const isAdjacent = GameEngine.checkAdjacent(selectedIndex, idx, cells, cols, true);
 
       if (isMatchable && isAdjacent) {
         // Valid Match!

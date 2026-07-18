@@ -49,7 +49,7 @@ export class PathFinder {
    * 3. Diagonal adjacent (only when they are direct neighbor cells)
    * 4. 1D sequential wrapping (reading order from left-to-right, top-to-bottom)
    */
-  static canConnect(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
+  static canConnect(idxA: number, idxB: number, cells: Cell[], cols: number, showDebugLogs: boolean = false): boolean {
     if (idxA === idxB) return false;
     if (!cells[idxA] || !cells[idxB]) return false;
 
@@ -183,19 +183,21 @@ export class PathFinder {
     }
 
     // If we reached here, no valid path was found.
-    // Log the details to the console as requested for debugging:
-    console.groupCollapsed(`[NumberMatch Debug] Connection BLOCKED for pair: (${valA} and ${valB})`);
-    console.log(`- Primeiro número: Valor ${valA} no Índice ${idxA} [Row ${r1}, Col ${c1}]`);
-    console.log(`- Segundo número: Valor ${valB} no Índice ${idxB} [Row ${r2}, Col ${c2}]`);
-    console.log(`- Caminhos analisados:`);
-    debugInfo.forEach(info => {
-      console.log(`  * [${info.pathType}]: ${info.status.toUpperCase()}`);
-      if (info.details) console.log(`    Detalhe: ${info.details}`);
-      if (info.blockedBy && info.blockedBy.length > 0) {
-        console.log(`    Célula(s) de bloqueio:`, info.blockedBy);
-      }
-    });
-    console.groupEnd();
+    // Log the details to the console if showDebugLogs is enabled
+    if (showDebugLogs) {
+      console.groupCollapsed(`[NumberMatch Debug] Connection BLOCKED for pair: (${valA} and ${valB})`);
+      console.log(`- Primeiro número: Valor ${valA} no Índice ${idxA} [Row ${r1}, Col ${c1}]`);
+      console.log(`- Segundo número: Valor ${valB} no Índice ${idxB} [Row ${r2}, Col ${c2}]`);
+      console.log(`- Caminhos analisados:`);
+      debugInfo.forEach(info => {
+        console.log(`  * [${info.pathType}]: ${info.status.toUpperCase()}`);
+        if (info.details) console.log(`    Detalhe: ${info.details}`);
+        if (info.blockedBy && info.blockedBy.length > 0) {
+          console.log(`    Célula(s) de bloqueio:`, info.blockedBy);
+        }
+      });
+      console.groupEnd();
+    }
 
     return false;
   }
@@ -203,12 +205,12 @@ export class PathFinder {
   /**
    * Complete validation function: checks both matchability and connectivity.
    */
-  static findPath(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
+  static findPath(idxA: number, idxB: number, cells: Cell[], cols: number, showDebugLogs: boolean = false): boolean {
     // 1. Math match check
     if (!this.canMatch(idxA, idxB, cells)) {
       return false;
     }
     // 2. Path check
-    return this.canConnect(idxA, idxB, cells, cols);
+    return this.canConnect(idxA, idxB, cells, cols, showDebugLogs);
   }
 }
