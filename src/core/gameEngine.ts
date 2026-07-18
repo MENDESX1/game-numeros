@@ -85,36 +85,23 @@ export const GameEngine = {
   },
 
   /**
-   * Duplicate all remaining active numbers and append them to the bottom of the board.
+   * Add new random lines to the bottom. Never duplicate existing lines.
    */
-  addRemainingNumbers(cells: Cell[], cols: number): Cell[] {
+  addRemainingNumbers(cells: Cell[], cols: number, difficulty: Difficulty = 'medium'): Cell[] {
     const nextCells = [...cells];
-    const activeIndices = this.getActiveIndices(cells);
+    const rowsToAdd = 3; // Adding 3 new rows
+    const totalNew = cols * rowsToAdd;
+    const newValues = this.generateIntelligentNumbers(totalNew, difficulty);
 
-    activeIndices.forEach(idx => {
-      const original = cells[idx];
+    for (let i = 0; i < totalNew; i++) {
       nextCells.push({
         id: this.generateId(),
-        value: original.value,
-        special: original.special,
-        frozenCount: original.frozenCount > 0 ? 1 : 0, // Fresh duplicates get at most 1 layer of ice
-        locked: original.locked,
-        multiplier: original.multiplier,
-        portalGroup: original.portalGroup,
-        removed: false
-      });
-    });
-
-    // Pad with empty cells to keep the row length aligned to columns
-    while (nextCells.length % cols !== 0) {
-      nextCells.push({
-        id: `empty-pad-${this.generateId()}`,
-        value: 0,
+        value: newValues[i],
         special: 'none',
         frozenCount: 0,
         locked: false,
         multiplier: 1,
-        removed: true
+        removed: false
       });
     }
 
@@ -409,26 +396,37 @@ export const GameEngine = {
     let cols = 9;
     let initialRows = 12;
 
+    // Difficulty base
     if (difficulty === 'easy') {
       initialRows = 10;
-      cols = 9;
     } else if (difficulty === 'medium') {
       initialRows = 12;
-      cols = 9;
     } else if (difficulty === 'hard') {
       initialRows = 14;
-      cols = 9;
     } else if (difficulty === 'insane') {
       initialRows = 16;
-      cols = 9;
     }
 
+    // Level-based progression (different layouts)
     if (userLevel === 1) {
-      initialRows = 8;
-      cols = 9;
+      initialRows = 6;
+      cols = 6;
     } else if (userLevel === 2) {
+      initialRows = 8;
+      cols = 7;
+    } else if (userLevel === 3) {
+      initialRows = 9;
+      cols = 8;
+    } else if (userLevel === 4) {
       initialRows = 10;
       cols = 9;
+    } else if (userLevel >= 5 && userLevel <= 10) {
+      initialRows = 10 + Math.floor(userLevel / 2);
+      cols = 9;
+    } else if (userLevel > 10) {
+      // Very high levels
+      initialRows = 15 + Math.floor(userLevel / 3);
+      cols = 10;
     }
 
     let cells: Cell[] = [];
@@ -785,7 +783,7 @@ export const GameEngine = {
     return this.removePair(idxA, idxB, cells, cols);
   },
 
-  addNumbers(cells: Cell[], cols: number): Cell[] {
-    return this.addRemainingNumbers(cells, cols);
+  addNumbers(cells: Cell[], cols: number, difficulty: Difficulty = 'medium'): Cell[] {
+    return this.addRemainingNumbers(cells, cols, difficulty);
   }
 };

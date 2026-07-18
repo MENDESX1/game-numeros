@@ -691,7 +691,7 @@ export default function App() {
     setProfile(GameStorage.getProfile());
   };
 
-  // Check if any moves are available with proactive, Zen-flow auto-reorganization
+  // Check if any moves are available
   const checkBoardLock = (currentCells: Cell[], currentCols: number) => {
     const activeCount = GameEngine.getActiveIndices(currentCells).length;
     if (activeCount === 0) {
@@ -701,38 +701,36 @@ export default function App() {
 
     const matches = GameEngine.getAvailableMatches(currentCells, currentCols);
     if (matches.length === 0) {
-      // Reorganize automatically keeping Zen momentum!
-      showToast(
-        config.language === 'pt' 
-          ? '🧘 Sem movimentos! Reorganizando tabuleiro automaticamente...' 
-          : config.language === 'es' 
-          ? '🧘 ¡Sin movimientos! Reorganizando el tablero automáticamente...' 
-          : '🧘 No moves left! Reorganizing board automatically...',
-        'info'
-      );
-      
-      setTimeout(() => {
-        setIsShuffling(true);
-        SynthAudio.playShuffle(config.soundEnabled);
-        const shuffled = GameEngine.shuffleBoard(currentCells, currentCols);
-        setCells(shuffled);
+      // User rule: When no moves, add new lines. Defeat if we can't add more lines.
+      if (currentCells.length >= 300) {
+        // Board is too full, no moves, cannot add lines
+        handleGameOver();
+      } else {
+        showToast(
+          config.language === 'pt'
+            ? '➕ Sem movimentos! Adicionando novas linhas...'
+            : '➕ No moves left! Adding new lines...',
+          'info'
+        );
         
-        // Confirm if we now have moves
-        const newMatches = GameEngine.getAvailableMatches(shuffled, currentCols);
-        if (newMatches.length === 0) {
-          const added = GameEngine.addNumbers(shuffled, currentCols);
+        setTimeout(() => {
+          setIsShuffling(true); // just use the animation flag for visual effect
+          SynthAudio.playShuffle(config.soundEnabled);
+          
+          const added = GameEngine.addNumbers(currentCells, currentCols, config.difficulty);
           setCells(added);
           setLinesAddedCount(prev => prev + 1);
-          showToast(
-            config.language === 'pt' ? '➕ Números duplicados para prosseguir!' : '➕ Numbers duplicated!',
-            'success'
-          );
-        }
-
-        setTimeout(() => {
-          setIsShuffling(false);
-        }, 850);
-      }, 950);
+          
+          setTimeout(() => {
+            setIsShuffling(false);
+            // Scroll to bottom
+            const container = document.getElementById('app-container');
+            if (container) {
+              container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+            }
+          }, 850);
+        }, 800);
+      }
     } else {
       setIsBoardLocked(false);
     }
@@ -1056,9 +1054,13 @@ export default function App() {
 
   // Append duplicates helper (when player gets stuck)
   const handleAddNumbers = () => {
+    if (cells.length >= 300) {
+      showToast(config.language === 'pt' ? 'Limite do tabuleiro atingido!' : 'Board limit reached!', 'error');
+      return;
+    }
     saveHistory();
     SynthAudio.playClick(config.soundEnabled);
-    const nextCells = GameEngine.addNumbers(cells, cols);
+    const nextCells = GameEngine.addNumbers(cells, cols, config.difficulty);
     setCells(nextCells);
     setSelectedIndex(null);
     setLinesAddedCount(prev => prev + 1);
@@ -1071,10 +1073,6 @@ export default function App() {
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
       }
     }, 100);
-
-    // Check if added cells exceed visual boundaries
-    const rows = Math.ceil(nextCells.length / cols);
-    // Limit removed, no game over
   };
 
   // Shuffle powerup
