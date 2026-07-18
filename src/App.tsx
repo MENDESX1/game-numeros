@@ -289,8 +289,7 @@ export default function App() {
       if (mode === 'timed' || (levelId && CHALLENGE_LEVELS.find(l => l.id === levelId)?.timeLimit)) {
         setTimeLeft(prev => {
           if (prev <= 1) {
-            clearInterval(gameIntervalRef.current);
-            handleGameOver();
+            // No game over anymore. Just stay at 0.
             return 0;
           }
           return prev - 1;
@@ -304,12 +303,7 @@ export default function App() {
             // Append line
             setCells(currentCells => {
               const withLine = GameEngine.appendRandomLine(currentCells, cols, difficulty);
-              
-              // If rows exceed visual maximum
-              const rowsCount = Math.ceil(withLine.length / cols);
-              if (rowsCount > 50) {
-                handleGameOver();
-              }
+              // Limit removed, no game over
               return withLine;
             });
             
@@ -941,9 +935,7 @@ export default function App() {
                 setLives(prev => {
                   const damage = bombsDetonatedCount * 2;
                   const nextLives = Math.max(0, prev - damage);
-                  if (nextLives <= 0) {
-                    setTimeout(() => handleGameOver(), 150);
-                  }
+                  // Game over removed
                   return nextLives;
                 });
                 showToast(`💥 ${bombsDetonatedCount} BOMBA(S) DETONARAM! -${bombsDetonatedCount * 2} VIDAS!`, 'error');
@@ -1042,9 +1034,7 @@ export default function App() {
         } else if (mode === 'survival') {
           setLives(prev => {
             const nextLives = prev - 1;
-            if (nextLives <= 0) {
-              handleGameOver();
-            }
+            // Game over removed
             return nextLives;
           });
         }
@@ -1079,9 +1069,7 @@ export default function App() {
 
     // Check if added cells exceed visual boundaries
     const rows = Math.ceil(nextCells.length / cols);
-    if (rows > 50) {
-      handleGameOver();
-    }
+    // Limit removed, no game over
   };
 
   // Shuffle powerup
