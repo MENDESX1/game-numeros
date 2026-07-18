@@ -663,7 +663,7 @@ export default function App() {
   };
 
   const checkVictoryConditions = (scoreVal: number, cellsLeft: Cell[], finalStep = false) => {
-    const activeLeft = cellsLeft.filter(c => !c.removed).length;
+    const activeLeft = GameEngine.getActiveIndices(cellsLeft).length;
 
     // Challenge Level criteria
     if (levelId) {
@@ -689,7 +689,7 @@ export default function App() {
 
       if (scoreTargetMet && specialTargetMet) {
         handleVictory(scoreVal);
-      } else if (finalStep && activeLeft === 0) {
+      } else if (finalStep && GameEngine.checkVictory(cellsLeft)) {
         // Clear board but targets missed
         handleGameOver();
       }
@@ -697,7 +697,7 @@ export default function App() {
     }
 
     // Classic/Normal modes: victory when full board is empty
-    if (activeLeft === 0) {
+    if (GameEngine.checkVictory(cellsLeft)) {
       handleVictory(scoreVal);
     }
   };
@@ -815,7 +815,7 @@ export default function App() {
 
   // Check if any moves are available with proactive, Zen-flow auto-reorganization
   const checkBoardLock = (currentCells: Cell[], currentCols: number) => {
-    const activeCount = currentCells.filter(c => !c.removed).length;
+    const activeCount = GameEngine.getActiveIndices(currentCells).length;
     if (activeCount === 0) {
       setIsBoardLocked(false);
       return; // Victory handled separately

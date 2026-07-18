@@ -2,7 +2,7 @@ import { Cell } from '../types';
 
 export class PathFinder {
   /**
-   * Helper to check if a cell is active (not removed and has non-zero value).
+   * Checks if a cell is active (is present, not removed, and has a non-zero value).
    */
   static isActive(cell: Cell | undefined): boolean {
     if (!cell) return false;
@@ -10,114 +10,205 @@ export class PathFinder {
   }
 
   /**
-   * Main validation logic for Number Match.
-   * Checks if two cells are matchable (equal or sum to 10)
-   * and if there is a valid unblocked path between them.
+   * Rule 1: Checks if two numbers are matchable (equal OR sum to 10).
+   * Also ensures neither cell is removed or locked.
+   */
+  static canMatch(idxA: number, idxB: number, cells: Cell[]): boolean {
+    if (idxA === idxB) {
+      return false;
+    }
+
+    const cellA = cells[idxA];
+    const cellB = cells[idxB];
+
+    if (!cellA || !cellB) {
+      return false;
+    }
+
+    // A cell that is removed or has value 0 is not matchable.
+    if (cellA.removed || cellB.removed || cellA.value === 0 || cellB.value === 0) {
+      return false;
+    }
+
+    // Locked cells cannot be matched.
+    if (cellA.locked || cellB.locked) {
+      return false;
+    }
+
+    const valA = cellA.value;
+    const valB = cellB.value;
+
+    return (valA === valB) || (valA + valB === 10);
+  }
+
+  /**
+   * Rule 2: Checks if there is a valid unblocked path between two cells.
+   * Path types allowed:
+   * 1. Same row (horizontal)
+   * 2. Same column (vertical)
+   * 3. Diagonal adjacent (only when they are direct neighbor cells)
+   * 4. 1D sequential wrapping (reading order from left-to-right, top-to-bottom)
    */
   static canConnect(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
     if (idxA === idxB) return false;
     if (!cells[idxA] || !cells[idxB]) return false;
-    if (cells[idxA].removed || cells[idxB].removed) return false;
-    if (cells[idxA].locked || cells[idxB].locked) return false;
-
-    const valA = cells[idxA].value;
-    const valB = cells[idxB].value;
-
-    // Rule 1: Two numbers can be removed only if they are equal or sum to 10.
-    const isMatchable = (valA === valB) || (valA + valB === 10);
-    if (!isMatchable) return false;
 
     const r1 = Math.floor(idxA / cols);
     const c1 = idxA % cols;
     const r2 = Math.floor(idxB / cols);
     const c2 = idxB % cols;
 
-    // We will track details of checks for debugging logs if everything fails
-    const blocks: string[] = [];
+    const valA = cells[idxA].value;
+    const valB = cells[idxB].value;
 
-    // 1. Same row check (horizontal) - empty/removed cells do not block
+    // Detailed debug trackers
+    const debugInfo: {
+      pathType: string;
+      blockedBy?: { idx: number; row: number; col: number; val: number }[];
+      status: 'unblocked' | 'blocked' | 'not-applicable';
+      details?: string;
+    }[] = [];
+
+    // --- 1. Same Row Check (Horizontal) ---
     if (r1 === r2) {
       const minCol = Math.min(c1, c2);
       const maxCol = Math.max(c1, c2);
-      let blocked = false;
-      const blockedCells: string[] = [];
+      const blocks: { idx: number; row: number; col: number; val: number }[] = [];
+
       for (let c = minCol + 1; c < maxCol; c++) {
-        const idx = r1 * cols + c;
-        if (this.isActive(cells[idx])) {
-          blocked = true;
-          blockedCells.push(`Row ${r1} Col ${c} (val: ${cells[idx].value})`);
+        const checkIdx = r1 * cols + c;
+        const cell = cells[checkIdx];
+        if (this.isActive(cell)) {
+          blocks.push({ idx: checkIdx, row: r1, col: c, val: cell.value });
         }
       }
-      if (!blocked) {
-        return true;
+
+      if (blocks.length === 0) {
+        return true; // Path is completely clear!
       } else {
-        blocks.push(`Horizontal path blocked by: [${blockedCells.join(', ')}]`);
+        debugInfo.push({
+          pathType: 'Horizontal (Same Row)',
+          blockedBy: blocks,
+          status: 'blocked',
+          details: `Blocked by active numbers between col ${minCol} and ${maxCol} on Row ${r1}`
+        });
       }
+    } else {
+      debugInfo.push({
+        pathType: 'Horizontal (Same Row)',
+        status: 'not-applicable',
+        details: `Cells are in different rows (Row ${r1} vs Row ${r2})`
+      });
     }
 
-    // 2. Same column check (vertical) - empty/removed cells do not block
+    // --- 2. Same Column Check (Vertical) ---
     if (c1 === c2) {
       const minRow = Math.min(r1, r2);
       const maxRow = Math.max(r1, r2);
-      let blocked = false;
-      const blockedCells: string[] = [];
+      const blocks: { idx: number; row: number; col: number; val: number }[] = [];
+
       for (let r = minRow + 1; r < maxRow; r++) {
-        const idx = r * cols + c1;
-        if (this.isActive(cells[idx])) {
-          blocked = true;
-          blockedCells.push(`Row ${r} Col ${c1} (val: ${cells[idx].value})`);
+        const checkIdx = r * cols + c1;
+        const cell = cells[checkIdx];
+        if (this.isActive(cell)) {
+          blocks.push({ idx: checkIdx, row: r, col: c1, val: cell.value });
         }
       }
-      if (!blocked) {
-        return true;
+
+      if (blocks.length === 0) {
+        return true; // Path is completely clear!
       } else {
-        blocks.push(`Vertical path blocked by: [${blockedCells.join(', ')}]`);
+        debugInfo.push({
+          pathType: 'Vertical (Same Column)',
+          blockedBy: blocks,
+          status: 'blocked',
+          details: `Blocked by active numbers between row ${minRow} and ${maxRow} on Col ${c1}`
+        });
       }
+    } else {
+      debugInfo.push({
+        pathType: 'Vertical (Same Column)',
+        status: 'not-applicable',
+        details: `Cells are in different columns (Col ${c1} vs Col ${c2})`
+      });
     }
 
-    // 3. Diagonal adjacent check (directly adjacent diagonally - neighbor cells only)
-    const isDiagonalAdjacent = Math.abs(r1 - r2) === 1 && Math.abs(c1 - c2) === 1;
+    // --- 3. Diagonal Adjacent Check (Only direct neighbors) ---
+    const rowDiff = Math.abs(r1 - r2);
+    const colDiff = Math.abs(c1 - c2);
+    const isDiagonalAdjacent = (rowDiff === 1 && colDiff === 1);
+
     if (isDiagonalAdjacent) {
-      return true;
-    } else if (Math.abs(r1 - r2) === Math.abs(c1 - c2)) {
-      blocks.push(`Diagonal path checked but they are not adjacent neighbors (Row diff: ${Math.abs(r1 - r2)}, Col diff: ${Math.abs(c1 - c2)})`);
+      return true; // Direct diagonal neighbors are always unblocked
+    } else if (rowDiff === colDiff) {
+      debugInfo.push({
+        pathType: 'Diagonal Adjacent',
+        status: 'blocked',
+        details: `Cells are diagonal but not adjacent neighbors (Row diff: ${rowDiff}, Col diff: ${colDiff})`
+      });
+    } else {
+      debugInfo.push({
+        pathType: 'Diagonal Adjacent',
+        status: 'not-applicable',
+        details: `Cells are not on a diagonal line (Row diff: ${rowDiff}, Col diff: ${colDiff})`
+      });
     }
 
-    // 4. Linear 1D sequential check (allows wrapping across rows sequentially)
+    // --- 4. 1D Sequential / Wrapping Check ---
     const minIdx = Math.min(idxA, idxB);
     const maxIdx = Math.max(idxA, idxB);
-    let blocked1D = false;
-    const blockedCells1D: string[] = [];
+    const blocks1D: { idx: number; row: number; col: number; val: number }[] = [];
+
     for (let i = minIdx + 1; i < maxIdx; i++) {
-      if (this.isActive(cells[i])) {
-        blocked1D = true;
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        blockedCells1D.push(`Index ${i} [Row ${row} Col ${col}] (val: ${cells[i].value})`);
-        break;
+      const cell = cells[i];
+      if (this.isActive(cell)) {
+        blocks1D.push({
+          idx: i,
+          row: Math.floor(i / cols),
+          col: i % cols,
+          val: cell.value
+        });
       }
     }
-    if (!blocked1D) {
-      return true;
+
+    if (blocks1D.length === 0) {
+      return true; // 1D flat path is completely clear (all cells between them are empty)
     } else {
-      blocks.push(`1D flat sequential path blocked by: ${blockedCells1D[0]}`);
+      debugInfo.push({
+        pathType: '1D Sequential Wrapping',
+        blockedBy: blocks1D,
+        status: 'blocked',
+        details: `Blocked by active cells in 1D reading order: ${blocks1D.map(b => `${b.val} at [Row ${b.row}, Col ${b.col}]`).join(', ')}`
+      });
     }
 
-    // If we reached here, the matchable pair is blocked.
-    // As requested: print detailed debugging logs whenever a pair is considered invalid/blocked.
-    console.warn(`[LogicMatch Debug] Invalid Connection detected for matching values (${valA} and ${valB}):`);
-    console.warn(`  - Pos 1: Index ${idxA} (Row ${r1}, Col ${c1})`);
-    console.warn(`  - Pos 2: Index ${idxB} (Row ${r2}, Col ${c2})`);
-    console.warn(`  - Checked paths result:`);
-    blocks.forEach(b => console.warn(`    * ${b}`));
-    console.warn(`  - Verdict: BLOCKED. Only active numbers block paths; empty cells never block.`);
+    // If we reached here, no valid path was found.
+    // Log the details to the console as requested for debugging:
+    console.groupCollapsed(`[NumberMatch Debug] Connection BLOCKED for pair: (${valA} and ${valB})`);
+    console.log(`- Primeiro número: Valor ${valA} no Índice ${idxA} [Row ${r1}, Col ${c1}]`);
+    console.log(`- Segundo número: Valor ${valB} no Índice ${idxB} [Row ${r2}, Col ${c2}]`);
+    console.log(`- Caminhos analisados:`);
+    debugInfo.forEach(info => {
+      console.log(`  * [${info.pathType}]: ${info.status.toUpperCase()}`);
+      if (info.details) console.log(`    Detalhe: ${info.details}`);
+      if (info.blockedBy && info.blockedBy.length > 0) {
+        console.log(`    Célula(s) de bloqueio:`, info.blockedBy);
+      }
+    });
+    console.groupEnd();
 
     return false;
   }
 
+  /**
+   * Complete validation function: checks both matchability and connectivity.
+   */
   static findPath(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
+    // 1. Math match check
+    if (!this.canMatch(idxA, idxB, cells)) {
+      return false;
+    }
+    // 2. Path check
     return this.canConnect(idxA, idxB, cells, cols);
   }
 }
-
-

@@ -2,6 +2,8 @@ import { PathFinder } from "./pathFinder";
 import { Cell, CellSpecial, GameMode, Difficulty } from '../types';
 
 export const GameEngine = {
+  // --- Core Utility Functions ---
+
   generateId(): string {
     return Math.random().toString(36).substring(2, 9);
   },
@@ -13,6 +15,293 @@ export const GameEngine = {
     if (difficulty === 'insane') return 19;
     return 9;
   },
+
+  // Retrieve indices of all active (non-removed) cells on the board
+  getActiveIndices(cells: Cell[]): number[] {
+    const indices: number[] = [];
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i] && !cells[i].removed && cells[i].value !== 0) {
+        indices.push(i);
+      }
+    }
+    return indices;
+  },
+
+  // --- Unified Modular Game Logic Functions ---
+
+  /**
+   * Check if two cell indices are mathematically matchable (equal or sum to 10).
+   */
+  canMatch(idxA: number, idxB: number, cells: Cell[]): boolean {
+    return PathFinder.canMatch(idxA, idxB, cells);
+  },
+
+  /**
+   * Check if two cell indices can connect (valid match + valid path).
+   */
+  canConnect(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
+    return PathFinder.findPath(idxA, idxB, cells, cols);
+  },
+
+  /**
+   * Find all available matches on the current board.
+   */
+  findAllMoves(cells: Cell[], cols: number): [number, number][] {
+    const activeIndices = this.getActiveIndices(cells);
+    const matches: [number, number][] = [];
+
+    for (let i = 0; i < activeIndices.length; i++) {
+      const idxA = activeIndices[i];
+      if (cells[idxA].locked) continue; // Locked cells cannot initiate a match
+
+      for (let j = i + 1; j < activeIndices.length; j++) {
+        const idxB = activeIndices[j];
+        if (cells[idxB].locked) continue; // Locked cells cannot be matched
+
+        if (this.canConnect(idxA, idxB, cells, cols)) {
+          matches.push([idxA, idxB]);
+        }
+      }
+    }
+
+    return matches;
+  },
+
+  /**
+   * Check if the board has any valid moves left.
+   */
+  hasMoves(cells: Cell[], cols: number): boolean {
+    return this.findAllMoves(cells, cols).length > 0;
+  },
+
+  /**
+   * Check if the player has won the game (no active numbers left on the board).
+   */
+  checkVictory(cells: Cell[]): boolean {
+    return this.getActiveIndices(cells).length === 0;
+  },
+
+  /**
+   * Duplicate all remaining active numbers and append them to the bottom of the board.
+   */
+  addRemainingNumbers(cells: Cell[], cols: number): Cell[] {
+    const nextCells = [...cells];
+    const activeIndices = this.getActiveIndices(cells);
+
+    activeIndices.forEach(idx => {
+      const original = cells[idx];
+      nextCells.push({
+        id: this.generateId(),
+        value: original.value,
+        special: original.special,
+        frozenCount: original.frozenCount > 0 ? 1 : 0, // Fresh duplicates get at most 1 layer of ice
+        locked: original.locked,
+        multiplier: original.multiplier,
+        portalGroup: original.portalGroup,
+        removed: false
+      });
+    });
+
+    // Pad with empty cells to keep the row length aligned to columns
+    while (nextCells.length % cols !== 0) {
+      nextCells.push({
+        id: `empty-pad-${this.generateId()}`,
+        value: 0,
+        special: 'none',
+        frozenCount: 0,
+        locked: false,
+        multiplier: 1,
+        removed: true
+      });
+    }
+
+    return nextCells;
+  },
+
+  /**
+   * Process matching and removal of a pair of numbers, applying special power-ups
+   * such as freezing ice, locked cells, multipliers, portals, and bomb explosions.
+   */
+  removePair(
+    idxA: number,
+    idxB: number,
+    cells: Cell[],
+    cols: number
+  ): {
+    updatedCells: Cell[];
+    scoreMultiplier: number;
+    explodedIndices: number[];
+    isIceBroken: boolean;
+    isLockOpened: boolean;
+    isBombTriggered: boolean;
+  } {
+    const nextCells = JSON.parse(JSON.stringify(cells)) as Cell[];
+    let scoreMultiplier = 1;
+    let explodedIndices: number[] = [];
+    let isIceBroken = false;
+    let isLockOpened = false;
+    let isBombTriggered = false;
+
+    const cellA = nextCells[idxA];
+    const cellB = nextCells[idxB];
+
+    if (!cellA || !cellB) {
+      return {
+        updatedCells: nextCells,
+        scoreMultiplier,
+        explodedIndices,
+        isIceBroken,
+        isLockOpened,
+        isBombTriggered
+      };
+    }
+
+    // Combine score multipliers
+    if (cellA.special === 'multiplier') scoreMultiplier *= cellA.multiplier;
+    if (cellB.special === 'multiplier') scoreMultiplier *= cellB.multiplier;
+
+    // Process Cell A
+    let removeA = false;
+    if (cellA.special === 'frozen') {
+      cellA.frozenCount--;
+      isIceBroken = true;
+      if (cellA.frozenCount <= 0) {
+        removeA = true;
+      }
+    } else {
+      removeA = true;
+    }
+
+    // Process Cell B
+    let removeB = false;
+    if (cellB.special === 'frozen') {
+      cellB.frozenCount--;
+      isIceBroken = true;
+      if (cellB.frozenCount <= 0) {
+        removeB = true;
+      }
+    } else {
+      removeB = true;
+    }
+
+    // Portals matched together
+    if (cellA.special === 'portal' && cellB.special === 'portal' && cellA.portalGroup === cellB.portalGroup) {
+      removeA = true;
+      removeB = true;
+    }
+
+    // Flag removals
+    if (removeA) cellA.removed = true;
+    if (removeB) cellB.removed = true;
+
+    // Bomb detonation logic (clears 3x3 surrounding cells)
+    const triggerBomb = (idx: number) => {
+      isBombTriggered = true;
+      const row = Math.floor(idx / cols);
+      const col = idx % cols;
+      const numRows = Math.ceil(nextCells.length / cols);
+
+      for (let r = row - 1; r <= row + 1; r++) {
+        for (let c = col - 1; c <= col + 1; c++) {
+          if (r >= 0 && r < numRows && c >= 0 && c < cols) {
+            const checkIdx = r * cols + c;
+            if (checkIdx < nextCells.length && !nextCells[checkIdx].removed) {
+              nextCells[checkIdx].removed = true;
+              explodedIndices.push(checkIdx);
+            }
+          }
+        }
+      }
+    };
+
+    if (removeA && cellA.special === 'bomb') {
+      triggerBomb(idxA);
+    }
+    if (removeB && cellB.special === 'bomb') {
+      triggerBomb(idxB);
+    }
+
+    // Lock breaking (unlocks adjacent locked cells)
+    const checkUnlockAdjacent = (idx: number) => {
+      const row = Math.floor(idx / cols);
+      const col = idx % cols;
+      const numRows = Math.ceil(nextCells.length / cols);
+      const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+      dirs.forEach(([dr, dc]) => {
+        const nr = row + dr;
+        const nc = col + dc;
+        if (nr >= 0 && nr < numRows && nc >= 0 && nc < cols) {
+          const adjIdx = nr * cols + nc;
+          if (adjIdx < nextCells.length && nextCells[adjIdx].special === 'locked' && nextCells[adjIdx].locked) {
+            nextCells[adjIdx].locked = false;
+            nextCells[adjIdx].special = 'none'; // Lock broken!
+            isLockOpened = true;
+          }
+        }
+      });
+    };
+
+    // Ice melting (cracks adjacent frozen ice)
+    const checkCrackAdjacentIce = (idx: number) => {
+      const row = Math.floor(idx / cols);
+      const col = idx % cols;
+      const numRows = Math.ceil(nextCells.length / cols);
+      const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+      dirs.forEach(([dr, dc]) => {
+        const nr = row + dr;
+        const nc = col + dc;
+        if (nr >= 0 && nr < numRows && nc >= 0 && nc < cols) {
+          const adjIdx = nr * cols + nc;
+          if (adjIdx < nextCells.length && nextCells[adjIdx].special === 'frozen' && nextCells[adjIdx].frozenCount > 0 && !nextCells[adjIdx].removed) {
+            nextCells[adjIdx].frozenCount--;
+            isIceBroken = true;
+            if (nextCells[adjIdx].frozenCount <= 0) {
+              nextCells[adjIdx].special = 'none'; // Melted
+            }
+          }
+        }
+      });
+    };
+
+    if (removeA) {
+      checkUnlockAdjacent(idxA);
+      checkCrackAdjacentIce(idxA);
+    }
+    if (removeB) {
+      checkUnlockAdjacent(idxB);
+      checkCrackAdjacentIce(idxB);
+    }
+
+    // Portal twin conversion
+    const handlePortalTwin = (idx: number, twinGroup: number) => {
+      for (let i = 0; i < nextCells.length; i++) {
+        if (i !== idx && nextCells[i].special === 'portal' && nextCells[i].portalGroup === twinGroup && !nextCells[i].removed) {
+          nextCells[i].special = 'none';
+          nextCells[i].portalGroup = undefined;
+        }
+      }
+    };
+
+    if (removeA && cellA.special === 'portal' && cellA.portalGroup) {
+      handlePortalTwin(idxA, cellA.portalGroup);
+    }
+    if (removeB && cellB.special === 'portal' && cellB.portalGroup) {
+      handlePortalTwin(idxB, cellB.portalGroup);
+    }
+
+    return {
+      updatedCells: nextCells,
+      scoreMultiplier,
+      explodedIndices,
+      isIceBroken,
+      isLockOpened,
+      isBombTriggered
+    };
+  },
+
+  // --- Board Initialization & Generation ---
 
   // Reverse-pairing constructor to generate beautifully-structured, solvable boards
   generateReverseSolvableGrid(cols: number, rows: number, difficulty: Difficulty = 'medium'): number[] {
@@ -72,7 +361,7 @@ export const GameEngine = {
       }
     }
 
-    // Fill any left-over isolated tiles with matching pairs intelligently (by nearest 2D distance)
+    // Fill any left-over isolated tiles with matching pairs intelligently
     const emptyIndices: number[] = [];
     for (let i = 0; i < total; i++) {
       if (grid[i] === 0) emptyIndices.push(i);
@@ -115,7 +404,7 @@ export const GameEngine = {
 
   generateInitialBoard(mode: GameMode, difficulty: Difficulty, userLevel: number = 1): { cells: Cell[]; cols: number } {
     let cols = 9;
-    let initialRows = 12; // Much fuller board from the start
+    let initialRows = 12;
 
     if (difficulty === 'easy') {
       initialRows = 10;
@@ -131,7 +420,6 @@ export const GameEngine = {
       cols = 9;
     }
 
-    // Gentle onboarding but still plenty of numbers
     if (userLevel === 1) {
       initialRows = 8;
       cols = 9;
@@ -159,36 +447,29 @@ export const GameEngine = {
         let bombTimer: number | undefined;
         let portalGroup: number | undefined;
 
-        // Apply game-mode specific mechanics explicitly
         if (mode === 'frozen') {
-          // 25% of tiles frozen on Frozen Mode
           if (Math.random() < 0.25) {
             special = 'frozen';
             frozenCount = Math.random() < 0.35 ? 2 : 1;
           }
         } else if (mode === 'bombs') {
-          // 12% of tiles are bombs with countdown timers
           if (Math.random() < 0.12) {
             special = 'bomb';
-            bombTimer = Math.floor(Math.random() * 6) + 10; // 10 to 15 moves countdown
+            bombTimer = Math.floor(Math.random() * 6) + 10;
           }
         } else if (mode === 'locks') {
-          // 15% of cells are locked
           if (Math.random() < 0.15) {
             special = 'locked';
             locked = true;
           }
         } else if (mode === 'multipliers') {
-          // 20% of cells are score multipliers
           if (Math.random() < 0.20) {
             special = 'multiplier';
             multiplier = Math.random() < 0.3 ? 3 : 2;
           }
         } else if (mode === 'relax') {
-          // Pure normal numbers, no obstacles
           special = 'none';
         } else {
-          // Standard modes (Classic, Timed, Challenge, Survival) have low chance of mixed obstacles based on difficulty
           let chanceOfObstacle = difficulty === 'easy' ? 0.02 : difficulty === 'medium' ? 0.06 : difficulty === 'hard' ? 0.10 : 0.15;
           
           if (Math.random() < chanceOfObstacle && userLevel >= 3) {
@@ -226,22 +507,18 @@ export const GameEngine = {
         });
       }
 
-      // Safeguard portals
       const portals = cells.filter(c => c.special === 'portal');
       if (portals.length % 2 !== 0 && portals.length > 0) {
         portals[portals.length - 1].special = 'none';
         portals[portals.length - 1].portalGroup = undefined;
       }
 
-      // Check if board is 100% solvable and satisfies difficulty constraints
       if (this.isValidBoard(cells, cols, difficulty)) {
         break;
       }
       attempts++;
     }
 
-    // Absolute fallback: If backtracking solver couldn't find a 100% solution,
-    // clear all special blockades to ensure perfect playability on base digits.
     if (attempts >= 50) {
       cells.forEach(c => {
         if (c.special === 'locked') {
@@ -258,7 +535,6 @@ export const GameEngine = {
     return { cells, cols };
   },
 
-  // Intelligent balanced pair pool generator
   generateIntelligentNumbers(total: number, difficulty: Difficulty = 'medium'): number[] {
     const pool: number[] = [];
     const pairCount = Math.floor(total / 2);
@@ -266,7 +542,7 @@ export const GameEngine = {
     const valueCounts: Record<number, number> = {};
     for (let i = 1; i <= maxNum; i++) valueCounts[i] = 0;
 
-    const maxCap = Math.max(2, Math.ceil(total * 0.18)); // Prevent repetitive number spam
+    const maxCap = Math.max(2, Math.ceil(total * 0.18));
 
     for (let p = 0; p < pairCount; p++) {
       let pairAdded = false;
@@ -291,7 +567,6 @@ export const GameEngine = {
       }
 
       if (!pairAdded) {
-        // Fallback pair if caps prevent random select
         let found = false;
         for (let a = 1; a <= maxNum; a++) {
           for (let b = 1; b <= maxNum; b++) {
@@ -313,7 +588,6 @@ export const GameEngine = {
       pool.push(Math.floor(Math.random() * maxNum) + 1);
     }
 
-    // Shuffle using Fisher-Yates
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const temp = pool[i];
@@ -324,19 +598,16 @@ export const GameEngine = {
     return pool;
   },
 
-  // Solver & balance validator
   isValidBoard(cells: Cell[], cols: number, difficulty: Difficulty): boolean {
     const activeCells = cells.filter(c => !c.removed);
     if (activeCells.length === 0) return false;
 
-    // 1. Ensure ample initial moves available
-    const matches = this.getAvailableMatches(cells, cols);
+    const matches = this.findAllMoves(cells, cols);
     const minMatches = difficulty === 'easy' ? 6 : difficulty === 'medium' ? 4 : difficulty === 'hard' ? 3 : 2;
     if (matches.length < minMatches) {
       return false;
     }
 
-    // 2. Ensure NO lonely numbers: every cell must have at least one valid partner
     for (const cell of activeCells) {
       let hasPartner = false;
       for (const partner of activeCells) {
@@ -352,23 +623,20 @@ export const GameEngine = {
       }
     }
 
-    // 3. Mathematical Backtracking Solver: verify board is completely clearable
     return this.canBeFullyCleared(cells, cols);
   },
 
-  // Dynamic backtracking solver with failed-state memoization to mathematically guarantee clearability
   canBeFullyCleared(cells: Cell[], cols: number): boolean {
     const activeIdx = this.getActiveIndices(cells);
     if (activeIdx.length === 0) return true;
 
     const memo = new Set<string>();
     let statesVisited = 0;
-    const maxStates = 500; // Optimal search limit for real-time validation
+    const maxStates = 500;
 
     const dfs = (currentCells: Cell[]): boolean => {
       statesVisited++;
       if (statesVisited > maxStates) {
-        // If search space is too deep, check if we cleared at least 85% of cells (fallback condition)
         const total = cells.filter(c => !c.removed).length;
         const current = currentCells.filter(c => !c.removed).length;
         return (total - current) / total >= 0.85;
@@ -379,7 +647,7 @@ export const GameEngine = {
         return true; 
       }
 
-      const matches = this.getAvailableMatches(currentCells, cols);
+      const matches = this.findAllMoves(currentCells, cols);
       if (matches.length === 0) {
         return false;
       }
@@ -389,7 +657,6 @@ export const GameEngine = {
         return false;
       }
 
-      // Sort matches to prioritize closer cell pairs to clear the board in a compact manner
       const sortedMatches = [...matches].sort((a, b) => {
         const distA = Math.abs(a[0] - a[1]);
         const distB = Math.abs(b[0] - b[1]);
@@ -397,7 +664,7 @@ export const GameEngine = {
       });
 
       for (const [idxA, idxB] of sortedMatches) {
-        const result = this.executeMatch(idxA, idxB, currentCells, cols);
+        const result = this.removePair(idxA, idxB, currentCells, cols);
         if (dfs(result.updatedCells)) {
           return true;
         }
@@ -410,7 +677,6 @@ export const GameEngine = {
     return dfs(cells);
   },
 
-  // Intelligent Shuffling preserving a valid, solvable state
   shuffleBoard(cells: Cell[], cols: number): Cell[] {
     const nextCells = JSON.parse(JSON.stringify(cells)) as Cell[];
     const activeIndices = this.getActiveIndices(nextCells);
@@ -419,7 +685,6 @@ export const GameEngine = {
 
     let attempts = 0;
     while (attempts < 50) {
-      // Gather active elements properties
       const shuffledItems = activeIndices.map(idx => ({
         value: nextCells[idx].value,
         special: nextCells[idx].special,
@@ -429,7 +694,6 @@ export const GameEngine = {
         portalGroup: nextCells[idx].portalGroup
       }));
 
-      // Fisher-Yates Shuffle
       for (let i = shuffledItems.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         const temp = shuffledItems[i];
@@ -437,7 +701,6 @@ export const GameEngine = {
         shuffledItems[j] = temp;
       }
 
-      // Assign back to cell list
       activeIndices.forEach((origIdx, i) => {
         nextCells[origIdx].value = shuffledItems[i].value;
         nextCells[origIdx].special = shuffledItems[i].special;
@@ -447,8 +710,7 @@ export const GameEngine = {
         nextCells[origIdx].portalGroup = shuffledItems[i].portalGroup;
       });
 
-      // Verify that shuffled grid has at least 3 moves
-      const matches = this.getAvailableMatches(nextCells, cols);
+      const matches = this.findAllMoves(nextCells, cols);
       if (matches.length >= 3) {
         break;
       }
@@ -458,265 +720,9 @@ export const GameEngine = {
     return nextCells;
   },
 
-  // Retrieve active cells in flattened order (excluding removed)
-  getActiveIndices(cells: Cell[]): number[] {
-    const indices: number[] = [];
-    for (let i = 0; i < cells.length; i++) {
-      if (!cells[i].removed) {
-        indices.push(i);
-      }
-    }
-    return indices;
-  },
-
-  // Check if two cells are matchable (same value OR sum to 10)
-  isMatchable(value1: number, value2: number): boolean {
-    return value1 === value2 || value1 + value2 === 10;
-  },
-
-  // Main adjacency algorithm: horizontal, vertical, or continuous 1D wrapping pathfinding
-  checkAdjacent(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
-    return PathFinder.canConnect(idxA, idxB, cells, cols);
-  },
-
-  // Get all valid moves on the current board
-  getAvailableMatches(cells: Cell[], cols: number): [number, number][] {
-    const activeIndices = this.getActiveIndices(cells);
-    const matches: [number, number][] = [];
-
-    // Optimize search: adjacent active cells in list are linear matches
-    for (let i = 0; i < activeIndices.length; i++) {
-      const idxA = activeIndices[i];
-      if (cells[idxA].locked) continue; // Locked cells cannot be matched
-
-      for (let j = i + 1; j < activeIndices.length; j++) {
-        const idxB = activeIndices[j];
-        if (cells[idxB].locked) continue;
-
-        if (PathFinder.canConnect(idxA, idxB, cells, cols)) {
-          matches.push([idxA, idxB]);
-        }
-      }
-    }
-
-    return matches;
-  },
-
-  // Perform a match between two cells.
-  // Returns updated cells, base score multiplier, list of indices affected by explosions, and any special notes
-  executeMatch(
-    idxA: number,
-    idxB: number,
-    cells: Cell[],
-    cols: number
-  ): {
-    updatedCells: Cell[];
-    scoreMultiplier: number;
-    explodedIndices: number[];
-    isIceBroken: boolean;
-    isLockOpened: boolean;
-    isBombTriggered: boolean;
-  } {
-    const nextCells = JSON.parse(JSON.stringify(cells)) as Cell[];
-    let scoreMultiplier = 1;
-    let explodedIndices: number[] = [];
-    let isIceBroken = false;
-    let isLockOpened = false;
-    let isBombTriggered = false;
-
-    const cellA = nextCells[idxA];
-    const cellB = nextCells[idxB];
-
-    // Combine multipliers
-    if (cellA.special === 'multiplier') scoreMultiplier *= cellA.multiplier;
-    if (cellB.special === 'multiplier') scoreMultiplier *= cellB.multiplier;
-
-    // Process Cell A
-    let removeA = false;
-    if (cellA.special === 'frozen') {
-      cellA.frozenCount--;
-      isIceBroken = true;
-      if (cellA.frozenCount <= 0) {
-        removeA = true;
-      }
-    } else {
-      removeA = true;
-    }
-
-    // Process Cell B
-    let removeB = false;
-    if (cellB.special === 'frozen') {
-      cellB.frozenCount--;
-      isIceBroken = true;
-      if (cellB.frozenCount <= 0) {
-        removeB = true;
-      }
-    } else {
-      removeB = true;
-    }
-
-    // If both portals are matched, clear portal status or clear together
-    if (cellA.special === 'portal' && cellB.special === 'portal' && cellA.portalGroup === cellB.portalGroup) {
-      removeA = true;
-      removeB = true;
-    }
-
-    // Actually flag as removed if required
-    if (removeA) cellA.removed = true;
-    if (removeB) cellB.removed = true;
-
-    // Detonate Bombs if matched
-    const triggerBomb = (idx: number) => {
-      isBombTriggered = true;
-      const row = Math.floor(idx / cols);
-      const col = idx % cols;
-
-      // Clear 3x3 surrounding cells
-      for (let r = row - 1; r <= row + 1; r++) {
-        for (let c = col - 1; c <= col + 1; c++) {
-          // Inner loops
-          const targetR = r;
-          const targetC = c;
-          if (targetR >= 0 && targetR < Math.ceil(nextCells.length / cols) && targetC >= 0 && targetC < cols) {
-            const checkIdx = targetR * cols + targetC;
-            if (checkIdx < nextCells.length && !nextCells[checkIdx].removed) {
-              nextCells[checkIdx].removed = true;
-              explodedIndices.push(checkIdx);
-            }
-          }
-        }
-      }
-    };
-
-    if (removeA && cellA.special === 'bomb') {
-      triggerBomb(idxA);
-    }
-    if (removeB && cellB.special === 'bomb') {
-      triggerBomb(idxB);
-    }
-
-    // Unlock surrounding locked cells when adjacent cells are cleared
-    const checkUnlockAdjacent = (idx: number) => {
-      const row = Math.floor(idx / cols);
-      const col = idx % cols;
-      const dirs = [
-        [-1, 0], [1, 0], [0, -1], [0, 1]
-      ];
-
-      dirs.forEach(([dr, dc]) => {
-        const nr = row + dr;
-        const nc = col + dc;
-        if (nr >= 0 && nr < Math.ceil(nextCells.length / cols) && nc >= 0 && nc < cols) {
-          const adjIdx = nr * cols + nc;
-          if (adjIdx < nextCells.length && nextCells[adjIdx].special === 'locked' && nextCells[adjIdx].locked) {
-            nextCells[adjIdx].locked = false;
-            nextCells[adjIdx].special = 'none'; // Lock broken!
-            isLockOpened = true;
-          }
-        }
-      });
-    };
-
-    // Crack surrounding ice when adjacent cells are cleared
-    const checkCrackAdjacentIce = (idx: number) => {
-      const row = Math.floor(idx / cols);
-      const col = idx % cols;
-      const dirs = [
-        [-1, 0], [1, 0], [0, -1], [0, 1]
-      ];
-
-      dirs.forEach(([dr, dc]) => {
-        const nr = row + dr;
-        const nc = col + dc;
-        if (nr >= 0 && nr < Math.ceil(nextCells.length / cols) && nc >= 0 && nc < cols) {
-          const adjIdx = nr * cols + nc;
-          if (adjIdx < nextCells.length && nextCells[adjIdx].special === 'frozen' && nextCells[adjIdx].frozenCount > 0 && !nextCells[adjIdx].removed) {
-            nextCells[adjIdx].frozenCount--;
-            isIceBroken = true;
-            if (nextCells[adjIdx].frozenCount <= 0) {
-              nextCells[adjIdx].special = 'none'; // Ice melted!
-            }
-          }
-        }
-      });
-    };
-
-    if (removeA) {
-      checkUnlockAdjacent(idxA);
-      checkCrackAdjacentIce(idxA);
-    }
-    if (removeB) {
-      checkUnlockAdjacent(idxB);
-      checkCrackAdjacentIce(idxB);
-    }
-
-    // Handle Linked Portals (if one portal cell was removed, find its twin and make it standard number or trigger match)
-    const handlePortalTwin = (idx: number, TwinGroup: number) => {
-      for (let i = 0; i < nextCells.length; i++) {
-        if (i !== idx && nextCells[i].special === 'portal' && nextCells[i].portalGroup === TwinGroup && !nextCells[i].removed) {
-          // Convert twin to a normal number now that portal group is split
-          nextCells[i].special = 'none';
-          nextCells[i].portalGroup = undefined;
-        }
-      }
-    };
-
-    if (removeA && cellA.special === 'portal' && cellA.portalGroup) {
-      handlePortalTwin(idxA, cellA.portalGroup);
-    }
-    if (removeB && cellB.special === 'portal' && cellB.portalGroup) {
-      handlePortalTwin(idxB, cellB.portalGroup);
-    }
-
-    return {
-      updatedCells: nextCells,
-      scoreMultiplier,
-      explodedIndices,
-      isIceBroken,
-      isLockOpened,
-      isBombTriggered
-    };
-  },
-
-  // Duplicate remaining numbers and append to the bottom
-  addNumbers(cells: Cell[], cols: number): Cell[] {
-    const nextCells = [...cells];
-    const activeCells = cells.filter(c => !c.removed);
-
-    activeCells.forEach(original => {
-      nextCells.push({
-        id: this.generateId(),
-        value: original.value,
-        special: original.special,
-        frozenCount: original.frozenCount > 0 ? 1 : 0, // Fresh duplicate gets at most 1 layer of ice
-        locked: original.locked,
-        multiplier: original.multiplier,
-        portalGroup: original.portalGroup,
-        removed: false
-      });
-    });
-
-    // Pad to a multiple of cols to ensure perfect 2D grid alignment and prevent rendering glitches or out-of-bounds math issues
-    while (nextCells.length % cols !== 0) {
-      nextCells.push({
-        id: `empty-pad-${this.generateId()}`,
-        value: 0,
-        special: 'none',
-        frozenCount: 0,
-        locked: false,
-        multiplier: 1,
-        removed: true
-      });
-    }
-
-    return nextCells;
-  },
-
-  // Append a random single line to the bottom (for Survival mode)
   appendRandomLine(cells: Cell[], cols: number, difficulty: Difficulty): Cell[] {
     const nextCells = [...cells];
     
-    // special rate in survival
     let specialProb = 0.05;
     if (difficulty === 'hard') specialProb = 0.1;
     if (difficulty === 'insane') specialProb = 0.15;
@@ -757,7 +763,6 @@ export const GameEngine = {
     return nextCells;
   },
 
-  // Clean trailing and mid-board fully-removed lines from the board to save space, shifting lower rows up
   cleanTrailingEmptyLines(cells: Cell[], cols: number): Cell[] {
     const nextCells = [...cells];
     const numRows = Math.floor(nextCells.length / cols);
@@ -766,7 +771,8 @@ export const GameEngine = {
     for (let r = 0; r < numRows; r++) {
       let rowEmpty = true;
       for (let c = 0; c < cols; c++) {
-        if (!nextCells[r * cols + c].removed) {
+        const cell = nextCells[r * cols + c];
+        if (cell && !cell.removed && cell.value !== 0) {
           rowEmpty = false;
           break;
         }
@@ -776,7 +782,6 @@ export const GameEngine = {
       }
     }
 
-    // Keep at least 4 rows on the board for a consistent visual presentation
     const minRows = 4;
     while (rowsToKeep.length < minRows) {
       const emptyRow: Cell[] = Array.from({ length: cols }, (_, i) => ({
@@ -792,5 +797,39 @@ export const GameEngine = {
     }
 
     return rowsToKeep.flat();
+  },
+
+  // --- Retrocompatible Wrappers for App.tsx integration ---
+
+  isMatchable(value1: number, value2: number): boolean {
+    return value1 === value2 || value1 + value2 === 10;
+  },
+
+  checkAdjacent(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
+    return this.canConnect(idxA, idxB, cells, cols);
+  },
+
+  getAvailableMatches(cells: Cell[], cols: number): [number, number][] {
+    return this.findAllMoves(cells, cols);
+  },
+
+  executeMatch(
+    idxA: number,
+    idxB: number,
+    cells: Cell[],
+    cols: number
+  ): {
+    updatedCells: Cell[];
+    scoreMultiplier: number;
+    explodedIndices: number[];
+    isIceBroken: boolean;
+    isLockOpened: boolean;
+    isBombTriggered: boolean;
+  } {
+    return this.removePair(idxA, idxB, cells, cols);
+  },
+
+  addNumbers(cells: Cell[], cols: number): Cell[] {
+    return this.addRemainingNumbers(cells, cols);
   }
 };
