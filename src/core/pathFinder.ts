@@ -14,7 +14,6 @@ export class PathFinder {
    * Also ensures neither cell is removed or locked.
    */
   static canMatch(idxA: number, idxB: number, cells: Cell[]): boolean {
-    console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.canMatch() executado para idxA:${idxA}, idxB:${idxB}`);
     if (idxA === idxB) {
       return false;
     }
@@ -47,8 +46,8 @@ export class PathFinder {
    * Path types allowed:
    * 1. Same row (horizontal)
    * 2. Same column (vertical)
-   * 3. Diagonal adjacent (only when they are direct neighbor cells)
-   * 4. 1D sequential wrapping (reading order from left-to-right, top-to-bottom)
+   * 3. Diagonal (any length, must have no active cells on the straight diagonal path)
+   * 4. 1D sequential wrapping (reading order from left-to-right, top-to-bottom, treating removed cells as transparent)
    */
   static canConnect(idxA: number, idxB: number, cells: Cell[], cols: number, showDebugLogs: boolean = false): boolean {
     if (idxA === idxB) return false;
@@ -70,6 +69,7 @@ export class PathFinder {
     if (r1 === r2) {
       let isBlocked = false;
       let blockerInfo = '';
+      // Check all intermediate columns on the same row. Only active numbers block.
       for (let c = c1 + 1; c < c2; c++) {
         const checkIdx = r1 * cols + c;
         if (this.isActive(cells[checkIdx])) {
@@ -88,6 +88,7 @@ export class PathFinder {
     if (c1 === c2) {
       let isBlocked = false;
       let blockerInfo = '';
+      // Check all intermediate rows in the same column. Only active numbers block.
       for (let r = r1 + 1; r < r2; r++) {
         const checkIdx = r * cols + c1;
         if (this.isActive(cells[checkIdx])) {
@@ -102,12 +103,13 @@ export class PathFinder {
       if (!isBlocked) return true;
     }
 
-    // --- 3. Diagonal Check (Any length, must have no active cells on the path) ---
+    // --- 3. Diagonal Check (Any length, must have no active cells on the diagonal path) ---
     const rowDiff = Math.abs(r1 - r2);
     const colDiff = Math.abs(c1 - c2);
     if (rowDiff === colDiff) {
       let isBlocked = false;
-      const dr = r2 > r1 ? 1 : -1;
+      // Since minIdx < maxIdx, r1 is always <= r2. For a true diagonal rowDiff is > 0, so r1 < r2.
+      const dr = 1;
       const dc = c2 > c1 ? 1 : -1;
       let blockerInfo = '';
       
@@ -131,6 +133,7 @@ export class PathFinder {
     // --- 4. 1D Sequential / Wrapping Check ---
     let isBlocked1D = false;
     let blockerInfo1D = '';
+    // Check all cells between the two indices in 1D reading order. Only active numbers block.
     for (let i = minIdx + 1; i < maxIdx; i++) {
       if (this.isActive(cells[i])) {
         isBlocked1D = true;
@@ -153,15 +156,12 @@ export class PathFinder {
    * Complete validation function: checks both matchability and connectivity.
    */
   static findPath(idxA: number, idxB: number, cells: Cell[], cols: number, showDebugLogs: boolean = false): boolean {
-    console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.findPath() chamado! idxA: ${idxA}, idxB: ${idxB}, valorA: ${cells[idxA]?.value}, valorB: ${cells[idxB]?.value}`);
     // 1. Math match check
     if (!this.canMatch(idxA, idxB, cells)) {
-      console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.findPath() REJEITADO por canMatch`);
       return false;
     }
     // 2. Path check
     const connected = this.canConnect(idxA, idxB, cells, cols, showDebugLogs);
-    console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.findPath() resultado da conexão: ${connected}`);
     return connected;
   }
 }

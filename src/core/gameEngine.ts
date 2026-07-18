@@ -58,6 +58,9 @@ export const GameEngine = {
         const idxB = activeIndices[j];
         if (cells[idxB].locked) continue; // Locked cells cannot be matched
 
+        // Optimize: check if they are mathematically matchable first, before expensive pathfinder logic
+        if (!this.isMatchable(cells[idxA].value, cells[idxB].value)) continue;
+
         if (this.canConnect(idxA, idxB, cells, cols, false)) {
           matches.push([idxA, idxB]);
         }
