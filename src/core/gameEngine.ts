@@ -476,7 +476,7 @@ export const GameEngine = {
 
   // Main adjacency algorithm: horizontal, vertical, or continuous 1D wrapping pathfinding
   checkAdjacent(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
-    return PathFinder.findPath(idxA, idxB, cells, cols);
+    return PathFinder.canConnect(idxA, idxB, cells, cols);
   },
 
   // Get all valid moves on the current board
@@ -493,10 +493,8 @@ export const GameEngine = {
         const idxB = activeIndices[j];
         if (cells[idxB].locked) continue;
 
-        if (this.isMatchable(cells[idxA].value, cells[idxB].value)) {
-          if (PathFinder.findPath(idxA, idxB, cells, cols)) {
-            matches.push([idxA, idxB]);
-          }
+        if (PathFinder.canConnect(idxA, idxB, cells, cols)) {
+          matches.push([idxA, idxB]);
         }
       }
     }

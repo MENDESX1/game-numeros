@@ -1,14 +1,24 @@
 import { Cell } from '../types';
 
 export class PathFinder {
-  static findPath(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
+  /**
+   * Main validation logic for Number Match.
+   * Checks if two cells are matchable (equal or sum to 10)
+   * and if there is a valid unblocked path between them.
+   */
+  static canConnect(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
     if (idxA === idxB) return false;
     if (!cells[idxA] || !cells[idxB]) return false;
     if (cells[idxA].removed || cells[idxB].removed) return false;
+    if (cells[idxA].locked || cells[idxB].locked) return false;
 
-    const minIdx = Math.min(idxA, idxB);
-    const maxIdx = Math.max(idxA, idxB);
+    // Rule 1: Two numbers can be removed only if they are equal or sum to 10.
+    const valA = cells[idxA].value;
+    const valB = cells[idxB].value;
+    const isMatchable = (valA === valB) || (valA + valB === 10);
+    if (!isMatchable) return false;
 
+    // Rule 2: Path check
     const r1 = Math.floor(idxA / cols);
     const c1 = idxA % cols;
     const r2 = Math.floor(idxB / cols);
@@ -44,12 +54,14 @@ export class PathFinder {
       if (!blocked) return true;
     }
 
-    // 3. Diagonal adjacent check (directly adjacent diagonally)
+    // 3. Diagonal adjacent check (directly adjacent diagonally - neighbor cells only)
     if (Math.abs(r1 - r2) === 1 && Math.abs(c1 - c2) === 1) {
       return true;
     }
 
     // 4. Linear 1D sequential check (allows wrapping across rows sequentially)
+    const minIdx = Math.min(idxA, idxB);
+    const maxIdx = Math.max(idxA, idxB);
     let blocked1D = false;
     for (let i = minIdx + 1; i < maxIdx; i++) {
       if (cells[i] && !cells[i].removed) {
@@ -61,5 +73,10 @@ export class PathFinder {
 
     return false;
   }
+
+  static findPath(idxA: number, idxB: number, cells: Cell[], cols: number): boolean {
+    return this.canConnect(idxA, idxB, cells, cols);
+  }
 }
+
 
