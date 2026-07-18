@@ -15,6 +15,7 @@ import {
   Award 
 } from 'lucide-react';
 import { SynthAudio } from '../audio/synth';
+import { motion } from 'motion/react';
 
 interface ChallengeLevel {
   id: number;
@@ -97,7 +98,14 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
   };
 
   return (
-    <div id="level-selector-screen" className="w-full max-w-4xl mx-auto flex flex-col gap-5 p-4 animate-fadeIn">
+    <motion.div 
+      id="level-selector-screen" 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="w-full max-w-4xl mx-auto flex flex-col gap-5 p-4"
+    >
       {/* Header and navigation */}
       <div className="flex items-center justify-between border-b pb-4 border-current/10">
         <div className="flex items-center gap-3">
@@ -326,6 +334,6 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };

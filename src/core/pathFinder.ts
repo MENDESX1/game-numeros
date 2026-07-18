@@ -14,6 +14,7 @@ export class PathFinder {
    * Also ensures neither cell is removed or locked.
    */
   static canMatch(idxA: number, idxB: number, cells: Cell[]): boolean {
+    console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.canMatch() executado para idxA:${idxA}, idxB:${idxB}`);
     if (idxA === idxB) {
       return false;
     }
@@ -101,26 +102,20 @@ export class PathFinder {
       if (!isBlocked) return true;
     }
 
-    // --- 3. Diagonal Check (Neighbors or empty diagonals of any length) ---
+    // --- 3. Diagonal Check (Only direct adjacent diagonal neighbors are allowed) ---
     const rowDiff = Math.abs(r1 - r2);
     const colDiff = Math.abs(c1 - c2);
     if (rowDiff === colDiff) {
-      let isBlocked = false;
-      let blockerInfo = '';
-      const dr = Math.sign(r2 - r1);
-      const dc = Math.sign(c2 - c1);
-      for (let step = 1; step < rowDiff; step++) {
-        const checkIdx = (r1 + step * dr) * cols + (c1 + step * dc);
-        if (this.isActive(cells[checkIdx])) {
-          isBlocked = true;
-          blockerInfo = `idx:${checkIdx}, v:${cells[checkIdx].value}`;
-          break;
+      if (rowDiff === 1) {
+        if (showDebugLogs) {
+          console.log(`  - Caminho Diagonal Adjacente (dist: 1): LIVRE`);
+        }
+        return true;
+      } else {
+        if (showDebugLogs) {
+          console.log(`  - Caminho Diagonal NÃO ADJACENTE (dist: ${rowDiff}): BLOQUEADO por regra (diagonais maiores que 1 não são permitidas)`);
         }
       }
-      if (showDebugLogs) {
-        console.log(`  - Caminho Diagonal (dist:${rowDiff}): ${isBlocked ? `BLOQUEADO por ${blockerInfo}` : 'LIVRE'}`);
-      }
-      if (!isBlocked) return true;
     }
 
     // --- 4. 1D Sequential / Wrapping Check ---
@@ -148,11 +143,15 @@ export class PathFinder {
    * Complete validation function: checks both matchability and connectivity.
    */
   static findPath(idxA: number, idxB: number, cells: Cell[], cols: number, showDebugLogs: boolean = false): boolean {
+    console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.findPath() chamado! idxA: ${idxA}, idxB: ${idxB}, valorA: ${cells[idxA]?.value}, valorB: ${cells[idxB]?.value}`);
     // 1. Math match check
     if (!this.canMatch(idxA, idxB, cells)) {
+      console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.findPath() REJEITADO por canMatch`);
       return false;
     }
     // 2. Path check
-    return this.canConnect(idxA, idxB, cells, cols, showDebugLogs);
+    const connected = this.canConnect(idxA, idxB, cells, cols, showDebugLogs);
+    console.log(`🚨🚨🚨 [LOGIC-RUNNING-CONFIRMATION] PathFinder.findPath() resultado da conexão: ${connected}`);
+    return connected;
   }
 }

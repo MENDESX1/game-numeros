@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { GameMode, Difficulty, Cell, UserProfile, UserStats, GameConfig, GameMission, Achievement } from './types';
 import { THEMES, TRANSLATIONS, DEFAULT_ACHIEVEMENTS } from './config/gameConfig';
 import { GameEngine } from './core/gameEngine';
-import { PathFinder } from "./core/pathFinder";
 import { GameStorage } from './storage/db';
 import { HistorySystem } from "./core/historySystem";
 import { SynthAudio } from './audio/synth';
@@ -1392,10 +1392,18 @@ export default function App() {
 
       {/* MAIN CONTAINER */}
       <main className={`flex-1 flex flex-col items-center justify-start lg:justify-center p-2 sm:p-4 relative z-10 w-full mx-auto transition-all duration-300 ${view === 'game' || view === 'levels' ? 'max-w-5xl' : 'max-w-4xl'}`}>
-        
-        {/* VIEW: MENU */}
-        {view === 'menu' && (
-          <div id="menu-screen" className="w-full max-w-md flex flex-col gap-6 animate-fadeIn">
+        <AnimatePresence mode="wait">
+          {/* VIEW: MENU */}
+          {view === 'menu' && (
+            <motion.div
+              key="menu"
+              id="menu-screen"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
+              className="w-full max-w-md flex flex-col gap-6"
+            >
             {/* Quick Stats Summary */}
             <div className={`flex items-center gap-3 p-4 rounded-2xl border ${activeTheme.cardBg}`}>
               <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center text-3xl shrink-0 ${profile.frame}`}>
@@ -1537,12 +1545,13 @@ export default function App() {
             </div>
 
 
-          </div>
+          </motion.div>
         )}
 
         {/* VIEW: LEVEL SELECTOR */}
         {view === 'levels' && (
           <LevelSelector
+            key="levels"
             currentLevelUnlocked={currentLevelUnlocked}
             levelStars={levelStars}
             config={config}
@@ -1554,7 +1563,15 @@ export default function App() {
 
         {/* VIEW: ACTIVE GAMEPLAY */}
         {view === 'game' && (
-          <div id="gameplay-screen" className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 items-start animate-fadeIn">
+          <motion.div
+            key="game"
+            id="gameplay-screen"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 items-start"
+          >
             {/* COLUMN 1: Dynamic Info Panel (Full dashboard) */}
             <div className="lg:col-span-4 w-full">
               <InfoPanel
@@ -1694,9 +1711,10 @@ export default function App() {
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
-      </main>
+      </AnimatePresence>
+    </main>
 
       {/* FOOTER curated credits */}
       <footer className="py-4 px-6 text-center text-[10px] uppercase tracking-widest text-gray-500 border-t border-white/5 bg-black/5 relative z-10">

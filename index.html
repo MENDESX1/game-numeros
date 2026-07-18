@@ -84,40 +84,28 @@
         window.dispatchEvent(new CustomEvent('pwa-installable'));
       });
 
-      // Register the custom service worker
+      // Unregister all active service workers and clear browser caches immediately on load
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => {
-              console.log('[Service Worker] Registered successfully:', reg.scope);
-
-              // Watch for updates
-              reg.addEventListener('updatefound', () => {
-                const newWorker = reg.installing;
-                if (newWorker) {
-                  newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                      console.log('[Service Worker] New update available; triggering immediate skip waiting...');
-                      newWorker.postMessage({ type: 'SKIP_WAITING' });
-                    }
-                  });
-                }
-              });
-            })
-            .catch(err => {
-              console.error('[Service Worker] Registration failed:', err);
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (const registration of registrations) {
+            registration.unregister().then(() => {
+              console.log('[Cleanup] Service Worker unregistered successfully');
             });
-        });
-
-        // Auto-reload the page when the new Service Worker takes control (only if there was an existing controller)
-        const hasExistingController = !!navigator.serviceWorker.controller;
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (hasExistingController && !refreshing) {
-            refreshing = true;
-            console.log('[Service Worker] Controller changed, reloading window...');
-            window.location.reload();
           }
+        }).catch(err => {
+          console.error('[Cleanup] Service Worker unregistration failed:', err);
+        });
+      }
+
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          for (const name of names) {
+            caches.delete(name).then(() => {
+              console.log('[Cleanup] Browser cache deleted:', name);
+            });
+          }
+        }).catch(err => {
+          console.error('[Cleanup] Cache deletion failed:', err);
         });
       }
     </script>
