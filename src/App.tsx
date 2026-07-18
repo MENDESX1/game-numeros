@@ -11,7 +11,7 @@ import { SynthAudio } from './audio/synth';
 import {
   Play, Settings, Trophy, ShoppingBag, Target, BarChart3, ChevronLeft,
   Plus, Lightbulb, Clock, Flame, Coins, Crown, Sparkles, AlertCircle,
-  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Undo2, Heart, Infinity
+  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Undo2, Heart, Infinity, Gift
 } from 'lucide-react';
 
 // Components
@@ -168,6 +168,7 @@ export default function App() {
   // Ref tracking for active gameplay timing
   const historyRef = useRef(new HistorySystem());
   const [canUndoState, setCanUndoState] = useState(false);
+  const [dailyReward, setDailyReward] = useState<{ rewarded: boolean; streak: number; rewardCoins: number } | null>(null);
   const gameIntervalRef = useRef<any>(null);
   const comboTimeoutRef = useRef<any>(null);
   const fpsFrameRef = useRef<number>(0);
@@ -178,7 +179,11 @@ export default function App() {
 
   // Initialize login streak and sound engines on mount
   useEffect(() => {
-    GameStorage.updateLoginStreak();
+    const rewardInfo = GameStorage.updateLoginStreak();
+    if (rewardInfo) {
+      setDailyReward(rewardInfo);
+      setProfile(GameStorage.getProfile());
+    }
     setStats(GameStorage.getStats());
 
     // Listen for first interaction to bootstrap synthetic background Zen music safely
@@ -2105,6 +2110,48 @@ export default function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* DAILY REWARD DIALOG */}
+      {dailyReward && (
+        <div id="dialog-daily-reward" className="fixed inset-0 bg-black/95 backdrop-blur-md z-[120] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0, y: 50 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            className={`max-w-md w-full p-8 rounded-3xl border border-yellow-500/30 bg-black shadow-2xl shadow-yellow-500/20 text-center relative overflow-hidden`}
+          >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600"></div>
+            
+            <div className="mx-auto w-20 h-20 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl flex items-center justify-center mb-6">
+              <Gift className="w-10 h-10 text-yellow-400" />
+            </div>
+            
+            <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-2">Recompensa Diária</h2>
+            <p className="text-gray-400 text-sm mb-6">Você voltou! Aqui está seu bônus de login diário.</p>
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-gray-400 text-sm font-bold uppercase tracking-widest">Sequência</span>
+                <span className="text-yellow-400 font-bold font-mono">{dailyReward.streak} dias🔥</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm font-bold uppercase tracking-widest">Recompensa</span>
+                <span className="text-yellow-400 font-bold font-mono text-xl">+{dailyReward.rewardCoins} 🪙</span>
+              </div>
+            </div>
+
+            <button
+              id="claim-daily-btn"
+              onClick={() => {
+                SynthAudio.playClick(config.soundEnabled);
+                setDailyReward(null);
+              }}
+              className={`w-full py-4 rounded-xl text-sm font-black uppercase tracking-widest bg-yellow-500 text-black hover:bg-yellow-400 transition-all`}
+            >
+              Coletar Recompensa
+            </button>
+          </motion.div>
         </div>
       )}
 

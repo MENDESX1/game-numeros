@@ -321,11 +321,11 @@ export const GameStorage = {
     return { levelUp, newLevel: profile.level };
   },
 
-  updateLoginStreak() {
+  updateLoginStreak(): { rewarded: boolean; streak: number; rewardCoins: number } | null {
     const stats = this.getStats();
     const todayStr = new Date().toLocaleDateString('sv-SE');
     
-    if (stats.lastPlayedDate === todayStr) return;
+    if (stats.lastPlayedDate === todayStr) return null;
 
     if (stats.lastPlayedDate) {
       const last = new Date(stats.lastPlayedDate);
@@ -343,7 +343,21 @@ export const GameStorage = {
     }
 
     stats.lastPlayedDate = todayStr;
+    
+    // Daily reward calculation: 100 + 20 for each consecutive day (up to 500)
+    const rewardCoins = Math.min(100 + ((stats.consecutiveDays - 1) * 20), 500);
+    
+    // Add coins to profile
+    const profile = this.getProfile();
+    profile.coins += rewardCoins;
+    
+    // Update lifetime stats
+    stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + rewardCoins;
+    
     this.saveStats(stats);
+    this.saveProfile(profile);
+    
+    return { rewarded: true, streak: stats.consecutiveDays, rewardCoins };
   },
 
   clearAllData() {
