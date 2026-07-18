@@ -1,9 +1,11 @@
 {
+  "id": "/",
   "name": "LogicMatch",
   "short_name": "LogicMatch",
   "description": "LogicMatch é um viciante jogo de lógica e números com blocos especiais, desafios progressivos e múltiplos modos.",
   "lang": "pt-BR",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",

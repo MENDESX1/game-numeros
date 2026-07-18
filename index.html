@@ -109,10 +109,11 @@
             });
         });
 
-        // Auto-reload the page when the new Service Worker takes control
+        // Auto-reload the page when the new Service Worker takes control (only if there was an existing controller)
+        const hasExistingController = !!navigator.serviceWorker.controller;
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
+          if (hasExistingController && !refreshing) {
             refreshing = true;
             console.log('[Service Worker] Controller changed, reloading window...');
             window.location.reload();

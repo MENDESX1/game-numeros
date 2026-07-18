@@ -61,6 +61,15 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
+  // Skip non-http/https protocols (e.g. chrome-extension:, ws:, wss:, data:, blob:)
+  if (requestUrl.protocol !== 'http:' && requestUrl.protocol !== 'https:') return;
+
+  // Never cache the Service Worker itself
+  if (requestUrl.pathname.endsWith('/sw.js') || requestUrl.pathname.endsWith('sw.js')) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // 1. Navigation requests (HTML pages) - Always Network-First to detect updates instantly, fallback to Cache
   if (request.mode === 'navigate' || requestUrl.pathname === '/' || requestUrl.pathname.endsWith('.html')) {
     event.respondWith(
