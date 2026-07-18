@@ -62,17 +62,11 @@ export default function App() {
   const [view, setView] = useState<'menu' | 'levels' | 'game'>('menu');
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
-  // PWA states
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isInstallable, setIsInstallable] = useState<boolean>(false);
+  // Navigation & system states
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [isIOS, setIsIOS] = useState<boolean>(false);
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
-  const [showPWAExitConfirm, setShowPWAExitConfirm] = useState<boolean>(false);
 
   // Tutorial states
   const [seenTutorial, setSeenTutorial] = useState<boolean>(() => {
@@ -198,54 +192,14 @@ export default function App() {
     window.addEventListener('click', handleFirstTouch);
     window.addEventListener('touchstart', handleFirstTouch);
 
-    // PWA: Listen for installation prompt
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setIsInstallable(true);
-    };
-
-    const handleCustomInstallable = () => {
-      const globalPrompt = (window as any).deferredPrompt;
-      if (globalPrompt) {
-        setDeferredPrompt(globalPrompt);
-        setIsInstallable(true);
-      }
-    };
-
-    // Check if prompt was already captured by index.html before React mounted
-    if ((window as any).deferredPrompt) {
-      handleCustomInstallable();
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('pwa-installable', handleCustomInstallable);
-
-    // PWA: Listen for successful installation
-    const handleAppInstalled = () => {
-      setDeferredPrompt(null);
-      (window as any).deferredPrompt = null;
-      setIsInstallable(false);
-      showToast(config.language === 'pt' ? 'Aplicativo instalado com sucesso na sua grade de aplicativos!' : 'Application successfully installed on your app grid!', 'success');
-    };
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    // PWA: Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstallable(false);
-    }
-
     return () => {
       window.removeEventListener('click', handleFirstTouch);
       window.removeEventListener('touchstart', handleFirstTouch);
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('pwa-installable', handleCustomInstallable);
-      window.removeEventListener('appinstalled', handleAppInstalled);
       SynthAudio.stopMusic();
     };
   }, []);
 
-  // PWA shortcut launcher, network listeners and iOS Safari detection
+  // Network listeners and deep-link check
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -258,13 +212,7 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // iOS Safari Detection
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
-    setIsIOS(isIOSDevice);
-    setIsStandalone(isStandaloneMode);
-
-    // Deep-link check for PWA shortcuts (?mode=...)
+    // Deep-link check for shortcuts (?mode=...)
     const params = new URLSearchParams(window.location.search);
     const modeParam = params.get('mode');
     if (modeParam === 'classic' || modeParam === 'survival' || modeParam === 'relax' || modeParam === 'timed' || modeParam === 'infinite') {
@@ -280,105 +228,6 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  // PWA Back Button Handling: Intercepts physical back button / back gesture to act as native app navigation
-  useEffect(() => {
-    // Push a guard state so back button can always be intercepted
-    const pushGuard = () => {
-      if (!window.history.state || !window.history.state.pwaGuard) {
-        window.history.pushState({ pwaGuard: true }, '');
-      }
-    };
-
-    pushGuard();
-
-    const handlePopState = (e: PopStateEvent) => {
-      if ((window as any)._pwaExiting) {
-        return;
-      }
-
-      // Restore guard immediately to continue interception
-      pushGuard();
-
-      // Custom native back-button action flow:
-      if (showPWAExitConfirm) {
-        setShowPWAExitConfirm(false);
-        SynthAudio.playClick(config.soundEnabled);
-        return;
-      }
-
-      if (activeModal !== null) {
-        setActiveModal(null);
-        SynthAudio.playClick(config.soundEnabled);
-        return;
-      }
-
-      if (showExitConfirm) {
-        setShowExitConfirm(false);
-        SynthAudio.playClick(config.soundEnabled);
-        return;
-      }
-
-      if (showRestartConfirm) {
-        setShowRestartConfirm(false);
-        SynthAudio.playClick(config.soundEnabled);
-        return;
-      }
-
-      if (isPaused) {
-        setIsPaused(false);
-        SynthAudio.playClick(config.soundEnabled);
-        return;
-      }
-
-      if (view === 'game') {
-        setShowExitConfirm(true);
-        SynthAudio.playClick(config.soundEnabled);
-        return;
-      }
-
-      if (view === 'levels') {
-        setView('menu');
-        SynthAudio.playClick(config.soundEnabled);
-        return;
-      }
-
-      if (view === 'menu') {
-        setShowPWAExitConfirm(true);
-        SynthAudio.playClick(config.soundEnabled);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [view, activeModal, isPaused, showPWAExitConfirm, showExitConfirm, showRestartConfirm, config.soundEnabled]);
-
-  // PWA: Install click handler
-  const handleInstallClick = async () => {
-    SynthAudio.playClick(config.soundEnabled);
-    if (!deferredPrompt) {
-      if (isIOS && !isStandalone) {
-        showToast(config.language === 'pt' ? 'Para instalar no iOS, toque em Compartilhar e "Adicionar à Tela de Início".' : 'To install on iOS, tap Share and "Add to Home Screen".', 'info');
-      } else if (isStandalone) {
-        showToast(config.language === 'pt' ? 'Aplicativo já está instalado e rodando em modo standalone!' : 'App is already installed and running in standalone mode!', 'info');
-      } else {
-        showToast(config.language === 'pt' ? 'Para instalar, use a opção "Adicionar à Tela Inicial" no menu do navegador.' : 'To install, use the "Add to Home Screen" option in your browser menu.', 'info');
-      }
-      return;
-    }
-    
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`User installation choice: ${outcome}`);
-      setDeferredPrompt(null);
-      setIsInstallable(false);
-    } catch (err) {
-      console.error('Failed to prompt install:', err);
-    }
-  };
 
   // Sync music state when config changes
   useEffect(() => {
@@ -1705,18 +1554,6 @@ export default function App() {
                     </div>
                   );
                 })()}
-
-                {/* Optional PWA Install Banner */}
-                <motion.button
-                  id="install-pwa-btn"
-                  onClick={handleInstallClick}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  className="mt-2 py-3 px-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] flex justify-center items-center gap-2 cursor-pointer shadow-md transition-all border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{config.language === 'pt' ? 'Instalar Aplicativo (PWA)' : config.language === 'es' ? 'Instalar Aplicación (PWA)' : 'Install Application (PWA)'}</span>
-                </motion.button>
               </div>
               
               {/* Navigation Drawer Shortcuts - Bento Grid style bar */}
@@ -2295,47 +2132,6 @@ export default function App() {
             localStorage.setItem('numzen_seen_tutorial', 'true');
           }}
         />
-      )}
-
-      {/* PWA NATIVE SYSTEM EXIT CONFIRMATION MODAL */}
-      {showPWAExitConfirm && (
-        <div id="dialog-pwa-exit-confirm" className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 animate-fadeIn">
-          <div className={`p-8 rounded-2xl border max-w-sm w-full text-center flex flex-col gap-6 items-center shadow-2xl ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}>
-            <div className="p-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 animate-pulse">
-              <Sparkles className="w-10 h-10 text-emerald-400" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <h3 className="text-2xl font-serif font-medium text-white tracking-tight">Sair do LogicMatch?</h3>
-              <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
-                Tem certeza que deseja fechar o aplicativo? Seu progresso e conquistas estão salvos com segurança.
-              </p>
-            </div>
-            <div className="flex gap-3 w-full mt-2">
-              <button
-                id="pwa-exit-yes-btn"
-                onClick={() => {
-                  SynthAudio.playClick(config.soundEnabled);
-                  (window as any)._pwaExiting = true;
-                  setShowPWAExitConfirm(false);
-                  window.history.go(-2);
-                }}
-                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-black transition-all active:scale-[0.96] cursor-pointer shadow-lg shadow-emerald-500/10"
-              >
-                Sim, Sair
-              </button>
-              <button
-                id="pwa-exit-no-btn"
-                onClick={() => {
-                  SynthAudio.playClick(config.soundEnabled);
-                  setShowPWAExitConfirm(false);
-                }}
-                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-widest border border-white/10 hover:bg-white/5 text-white transition-all active:scale-[0.96] cursor-pointer"
-              >
-                Voltar
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

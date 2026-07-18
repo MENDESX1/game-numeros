@@ -10,8 +10,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" as="style" />
     
-    <!-- PWA Config -->
-    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="LogicMatch é um viciante jogo de lógica e números com blocos especiais, desafios progressivos e múltiplos modos. Teste seu raciocínio lógico!" />
     <meta name="keywords" content="jogo de lógica, puzzle numérico, logic match, jogos de matemática, quebra-cabeça, desafios cognitivos, jogos mobile" />
@@ -34,13 +32,7 @@
     <meta property="twitter:description" content="Um viciante jogo de lógica e números com blocos especiais e múltiplos modos." />
     <meta property="twitter:image" content="https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/icon-512.png" />
 
-    <meta name="mobile-web-app-capable" content="yes" />
-    
-    <!-- iOS / Apple Mobile Web App Meta -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="LogicMatch" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
     
     <!-- Favicon configurations -->
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
@@ -75,16 +67,8 @@
       }
     }
     </script>
-    <!-- Global capture for PWA install prompt to prevent React race conditions -->
+    <!-- Unregister all active service workers and clear browser caches immediately on load -->
     <script>
-      window.deferredPrompt = null;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        window.deferredPrompt = e;
-        window.dispatchEvent(new CustomEvent('pwa-installable'));
-      });
-
-      // Unregister all active service workers and clear browser caches immediately on load
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(registrations => {
           for (const registration of registrations) {
