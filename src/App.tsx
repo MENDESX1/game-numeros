@@ -95,6 +95,7 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [movesLeft, setMovesLeft] = useState<number>(0);
   const [survivalTick, setSurvivalTick] = useState<number>(12);
+  const [survivalRewardMilestone, setSurvivalRewardMilestone] = useState<number>(1);
   const [hintsLeft, setHintsLeft] = useState<number>(3);
   const [highlightedIndices, setHighlightedIndices] = useState<number[]>([]);
   
@@ -150,11 +151,16 @@ export default function App() {
   const [currentLevelUnlocked, setCurrentLevelUnlocked] = useState<number>(() => {
     // Read from localStorage challenge milestones
     const saved = localStorage.getItem('numzen_challenge_milestone');
-    return saved ? parseInt(saved, 10) : 1;
+    const parsed = saved ? parseInt(saved, 10) : 1;
+    return isNaN(parsed) ? 1 : parsed;
   });
   const [levelStars, setLevelStars] = useState<Record<number, number>>(() => {
-    const saved = localStorage.getItem('numzen_challenge_stars');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem('numzen_challenge_stars');
+      return (saved && saved !== 'null') ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
   });
 
   // Modal displays
@@ -326,10 +332,36 @@ export default function App() {
     };
   }, [view, gameOver, victory, mode, levelId, isPaused]);
 
+  // Survival mode milestone rewards
+  useEffect(() => {
+    if (mode === 'survival' && score > 0) {
+      const currentMilestone = Math.floor(score / 2000);
+      if (currentMilestone >= survivalRewardMilestone) {
+        // Player reached a new 2000 point milestone!
+        setSurvivalRewardMilestone(currentMilestone + 1);
+        
+        if (lives < maxLives) {
+          setLives(prev => Math.min(maxLives, prev + 1));
+          showToast(`+1 Vida! (2000 pontos)`, 'success');
+          SynthAudio.playLevelUp(config.soundEnabled);
+        } else {
+          // Grant 50 coins instead if already at max lives
+          setProfile(prev => {
+            const next = { ...prev, coins: prev.coins + 50 };
+            GameStorage.saveProfile(next);
+            return next;
+          });
+          showToast(`+50 Moedas! (2000 pontos, Vidas Cheias)`, 'success');
+          SynthAudio.playCoin(config.soundEnabled);
+        }
+      }
+    }
+  }, [score, mode, survivalRewardMilestone, lives, maxLives, config.soundEnabled]);
+
   useEffect(() => {
     if (view === 'game' && !gameOver && !victory && cells.length > 0 && !isResumingRef.current) {
       const stateToSave = {
-        mode, difficulty, levelId, cells, cols, score, combo, timeLeft, survivalTick,
+        mode, difficulty, levelId, cells, cols, score, combo, timeLeft, survivalTick, survivalRewardMilestone,
         hintsLeft, highlightedIndices, clearedIce, clearedLocks, clearedBombs,
         linesAddedCount, maxComboInLevel, clearedNumbersCount, lives, maxLives, shufflesLeft, movesLeft,
         hintsUsed, powersUsed, lastMatchTime
@@ -337,7 +369,7 @@ export default function App() {
       GameStorage.saveActiveGame(stateToSave);
       // Don't call setActiveSavedGame here to avoid unnecessary re-renders in the menu
     }
-  }, [view, mode, difficulty, levelId, cells, cols, score, combo, timeLeft, survivalTick, hintsLeft, highlightedIndices, clearedIce, clearedLocks, clearedBombs, linesAddedCount, maxComboInLevel, clearedNumbersCount, lives, maxLives, shufflesLeft, movesLeft, hintsUsed, powersUsed, lastMatchTime, gameOver, victory]);
+  }, [view, mode, difficulty, levelId, cells, cols, score, combo, timeLeft, survivalTick, survivalRewardMilestone, hintsLeft, highlightedIndices, clearedIce, clearedLocks, clearedBombs, linesAddedCount, maxComboInLevel, clearedNumbersCount, lives, maxLives, shufflesLeft, movesLeft, hintsUsed, powersUsed, lastMatchTime, gameOver, victory]);
 
   // Handle Level XP and Profile state updates
   const handleXPAdd = (amount: number) => {
@@ -364,6 +396,7 @@ export default function App() {
       setCombo(activeSavedGame.combo);
       setTimeLeft(activeSavedGame.timeLeft);
       setSurvivalTick(activeSavedGame.survivalTick);
+      setSurvivalRewardMilestone(activeSavedGame.survivalRewardMilestone || 1);
       setHintsLeft(activeSavedGame.hintsLeft);
       setHighlightedIndices(activeSavedGame.highlightedIndices);
       setClearedIce(activeSavedGame.clearedIce);
@@ -457,6 +490,7 @@ export default function App() {
 
     setLives(initialLives);
     setMaxLives(initialLives);
+    setSurvivalRewardMilestone(1);
     setShufflesLeft(initialShuffles);
     setInvalidMatch(null);
     setIsBoardLocked(false);
@@ -776,9 +810,10 @@ export default function App() {
 
     const matches = GameEngine.getAvailableMatches(currentCells, currentCols);
     if (matches.length === 0) {
-      // User rule: When no moves, add new lines. Defeat if we can't add more lines.
-      if (currentCells.length >= 300) {
-        // Board is too full, no moves, cannot add lines
+      // User rule: When no moves, add new lines. 
+      // Defeat if board gets impossibly huge, but 300 is too small for survival. Let's increase it to 1000 or just remove it.
+      if (activeCount >= 1500) {
+        // Board is insanely full, no moves, cannot add lines (failsafe)
         handleGameOver();
       } else {
         showToast(
