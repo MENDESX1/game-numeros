@@ -159,7 +159,16 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                     <span className={`text-sm font-semibold ${themeStyles.textPrimary}`}>
                       {item.nameKey}
                     </span>
-                    <span className={`text-[10px] capitalize ${themeStyles.textSecondary}`}>
+                    {(() => {
+                      const perkText = config.language === 'es' ? item.perkES : config.language === 'en' ? item.perkEN : item.perkPT;
+                      if (!perkText) return null;
+                      return (
+                        <span className={`text-[10px] leading-tight font-medium mt-0.5 max-w-[210px] ${item.category === 'avatar' ? 'text-yellow-600 dark:text-yellow-400' : 'text-current opacity-60'}`}>
+                          {perkText}
+                        </span>
+                      );
+                    })()}
+                    <span className={`text-[9px] uppercase tracking-wider font-mono opacity-50 mt-1 capitalize`}>
                       {unlocked ? (equipped ? t.equipped : 'Desbloqueado') : t.locked_item}
                     </span>
                   </div>

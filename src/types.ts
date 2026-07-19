@@ -118,6 +118,9 @@ export interface ShopItem {
   cost: number;
   previewColor?: string; // For themes
   previewImage?: string; // For avatar/frame
+  perkPT?: string;       // Perk description in Portuguese
+  perkEN?: string;       // Perk description in English
+  perkES?: string;       // Perk description in Spanish
 }
 
 export interface GameConfig {

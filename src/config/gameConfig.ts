@@ -534,23 +534,149 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'cyberpunk', category: 'theme', nameKey: 'Cyberpunk 2077', cost: 600, previewColor: '#fcee0a' },
   { id: 'minimalist', category: 'theme', nameKey: 'Charcoal Minimalist', cost: 800, previewColor: '#ffffff' },
 
-  // Avatars
-  { id: 'av_1', category: 'avatar', nameKey: 'Iniciante', cost: 0, previewImage: '🧘' },
-  { id: 'av_2', category: 'avatar', nameKey: 'Matemático', cost: 50, previewImage: '🧮' },
-  { id: 'av_3', category: 'avatar', nameKey: 'Luminoso', cost: 100, previewImage: '💡' },
-  { id: 'av_4', category: 'avatar', nameKey: 'Samurai', cost: 200, previewImage: '⚔️' },
-  { id: 'av_5', category: 'avatar', nameKey: 'Foguete', cost: 300, previewImage: '🚀' },
-  { id: 'av_6', category: 'avatar', nameKey: 'Dragão', cost: 500, previewImage: '🐲' },
-  { id: 'av_7', category: 'avatar', nameKey: 'Coringa', cost: 800, previewImage: '🃏' },
-  { id: 'av_8', category: 'avatar', nameKey: 'Mago dos Números', cost: 1200, previewImage: '🧙‍♂️' },
+  // Avatars with passive perks!
+  { 
+    id: 'av_1', 
+    category: 'avatar', 
+    nameKey: 'Iniciante', 
+    cost: 0, 
+    previewImage: '🧘',
+    perkPT: 'Sem bônus passivo.',
+    perkEN: 'No passive perk.',
+    perkES: 'Sin bono pasivo.'
+  },
+  { 
+    id: 'av_2', 
+    category: 'avatar', 
+    nameKey: 'Matemático', 
+    cost: 50, 
+    previewImage: '🧮',
+    perkPT: 'Mente Calculadora: +2 Jogadas extras em fases com limites de jogada.',
+    perkEN: 'Calculator Mind: +2 Extra Moves in stage-limited modes.',
+    perkES: 'Mente Calculadora: +2 Movimientos extras en niveles limitados.'
+  },
+  { 
+    id: 'av_3', 
+    category: 'avatar', 
+    nameKey: 'Luminoso', 
+    cost: 100, 
+    previewImage: '💡',
+    perkPT: 'Idéia Brilhante: Inicia com +1 dica grátis em todas as fases.',
+    perkEN: 'Bright Idea: Start with +1 free hint in all matches.',
+    perkES: 'Idea Brillante: Comienza con +1 pista gratis en todas las partidas.'
+  },
+  { 
+    id: 'av_4', 
+    category: 'avatar', 
+    nameKey: 'Samurai', 
+    cost: 200, 
+    previewImage: '⚔️',
+    perkPT: 'Foco de Aço: Combo dura +2.0s a mais antes de resetar.',
+    perkEN: 'Steel Focus: Combo hold duration is increased by +2.0s.',
+    perkES: 'Enfoque de Acero: El combo dura +2.0s más antes de reiniciarse.'
+  },
+  { 
+    id: 'av_5', 
+    category: 'avatar', 
+    nameKey: 'Foguete', 
+    cost: 300, 
+    previewImage: '🚀',
+    perkPT: 'Propulsão Vital: Inicia com +1 vida extra (erros permitidos) e +1 embaralhar.',
+    perkEN: 'Vital Thruster: Start with +1 extra life and +1 extra shuffle.',
+    perkES: 'Propulsión Vital: Comienza con +1 vida extra y +1 embarajar adicional.'
+  },
+  { 
+    id: 'av_6', 
+    category: 'avatar', 
+    nameKey: 'Dragão', 
+    cost: 500, 
+    previewImage: '🐲',
+    perkPT: 'Fogo Destruidor: Detonações dão o dobro de pontos de bônus e o dobro de moedas.',
+    perkEN: 'Destructive Fire: Bomb explosions grant double score and double safe coins.',
+    perkES: 'Fuego Destructor: Detonaciones dan el doble de puntos y el doble de monedas.'
+  },
+  { 
+    id: 'av_7', 
+    category: 'avatar', 
+    nameKey: 'Coringa', 
+    cost: 800, 
+    previewImage: '🃏',
+    perkPT: 'Sorte do Palhaço: 10% de chance de ganhar +10 moedas bônus ao fazer qualquer par.',
+    perkEN: 'Lucky Match: 10% chance to earn +10 bonus coins on any matched pair.',
+    perkES: 'Suerte del bufón: 10% de probabilidad de ganar +10 monedas por pareja.'
+  },
+  { 
+    id: 'av_8', 
+    category: 'avatar', 
+    nameKey: 'Mago dos Números', 
+    cost: 1200, 
+    previewImage: '🧙‍♂️',
+    perkPT: 'Alquimia Dourada: +25% de moedas ganhas no fim de todas as fases.',
+    perkEN: 'Gold Alchemy: +25% bonus coins earned at the end of all matches.',
+    perkES: 'Alquimia Dorada: +25% de monedas de bonificación al final de las partidas.'
+  },
 
-  // Frames
-  { id: 'fr_1', category: 'frame', nameKey: 'Sem Moldura', cost: 0, previewImage: 'border-transparent' },
-  { id: 'fr_2', category: 'frame', nameKey: 'Bronze Fino', cost: 100, previewImage: 'border border-amber-600 shadow-md' },
-  { id: 'fr_3', category: 'frame', nameKey: 'Prata Polida', cost: 200, previewImage: 'border-2 border-slate-400 shadow-lg' },
-  { id: 'fr_4', category: 'frame', nameKey: 'Ouro Imperial', cost: 400, previewImage: 'border-2 border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]' },
-  { id: 'fr_5', category: 'frame', nameKey: 'Plasma Cyber', cost: 600, previewImage: 'border-2 border-cyan-400 animate-pulse shadow-[0_0_12px_rgba(34,211,238,0.6)]' },
-  { id: 'fr_6', category: 'frame', nameKey: 'Fogo Escuro', cost: 1000, previewImage: 'border-2 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]' }
+  // Frames with style descriptions!
+  { 
+    id: 'fr_1', 
+    category: 'frame', 
+    nameKey: 'Sem Moldura', 
+    cost: 0, 
+    previewImage: 'border-transparent',
+    perkPT: 'Visual padrão simples e minimalista.',
+    perkEN: 'Simple and minimalistic default look.',
+    perkES: 'Aspecto simple y minimalista predeterminado.'
+  },
+  { 
+    id: 'fr_2', 
+    category: 'frame', 
+    nameKey: 'Bronze Fino', 
+    cost: 100, 
+    previewImage: 'border border-amber-600 shadow-md',
+    perkPT: 'Uma moldura estilosa esculpida em bronze polido.',
+    perkEN: 'A stylish border sculpted in polished bronze.',
+    perkES: 'Un marco elegante esculpido en bronce pulido.'
+  },
+  { 
+    id: 'fr_3', 
+    category: 'frame', 
+    nameKey: 'Prata Polida', 
+    cost: 200, 
+    previewImage: 'border-2 border-slate-400 shadow-lg',
+    perkPT: 'Moldura brilhante feita de prata maciça e lustrada.',
+    perkEN: 'Shining border made of solid, burnished silver.',
+    perkES: 'Marco brillante hecho de plata maciza y pulida.'
+  },
+  { 
+    id: 'fr_4', 
+    category: 'frame', 
+    nameKey: 'Ouro Imperial', 
+    cost: 400, 
+    previewImage: 'border-2 border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]',
+    perkPT: 'Moldura real em ouro puro com uma fina aura divina.',
+    perkEN: 'Royal pure gold border radiating a subtle divine aura.',
+    perkES: 'Marco real de oro puro que irradia una sutil aura divina.'
+  },
+  { 
+    id: 'fr_5', 
+    category: 'frame', 
+    nameKey: 'Plasma Cyber', 
+    cost: 600, 
+    previewImage: 'border-2 border-cyan-400 animate-pulse shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    perkPT: 'Moldura de plasma tecnológico neon ciano vibrante.',
+    perkEN: 'High-tech neon cyan plasma glowing frame.',
+    perkES: 'Marco brillante de plasma de neón cian tecnológico.'
+  },
+  { 
+    id: 'fr_6', 
+    category: 'frame', 
+    nameKey: 'Fogo Escuro', 
+    cost: 1000, 
+    previewImage: 'border-2 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]',
+    perkPT: 'Moldura infernal envolta em chamas negras e brasas vermelhas.',
+    perkEN: 'Infernal frame engulfed in dark flames and glowing embers.',
+    perkES: 'Marco infernal envuelto en llamas oscuras y brasas rojas.'
+  }
 ];
 
 export const DEFAULT_ACHIEVEMENTS: Achievement[] = [

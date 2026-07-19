@@ -89,20 +89,40 @@ export const GameEngine = {
    */
   addRemainingNumbers(cells: Cell[], cols: number, difficulty: Difficulty = 'medium'): Cell[] {
     const nextCells = [...cells];
-    const rowsToAdd = 3; // Adding 3 new rows
-    const totalNew = cols * rowsToAdd;
-    const newValues = this.generateIntelligentNumbers(totalNew, difficulty);
+    
+    // Classical Numberama rule: duplicate all remaining active cell values in order!
+    const activeCells = cells.filter(c => !c.removed && c.value !== 0);
+    if (activeCells.length === 0) return nextCells;
 
-    for (let i = 0; i < totalNew; i++) {
+    const valuesToAppend = activeCells.map(c => c.value);
+
+    for (const val of valuesToAppend) {
       nextCells.push({
         id: this.generateId(),
-        value: newValues[i],
+        value: val,
         special: 'none',
         frozenCount: 0,
         locked: false,
         multiplier: 1,
         removed: false
       });
+    }
+
+    // Pad to a multiple of cols with empty, removed placeholder cells
+    const remainder = nextCells.length % cols;
+    if (remainder !== 0) {
+      const padCount = cols - remainder;
+      for (let i = 0; i < padCount; i++) {
+        nextCells.push({
+          id: `pad-${this.generateId()}`,
+          value: 0,
+          special: 'none',
+          frozenCount: 0,
+          locked: false,
+          multiplier: 1,
+          removed: true
+        });
+      }
     }
 
     return nextCells;
@@ -294,10 +314,22 @@ export const GameEngine = {
   // --- Board Initialization & Generation ---
 
   // Reverse-pairing constructor to generate beautifully-structured, solvable boards
-  generateReverseSolvableGrid(cols: number, rows: number, difficulty: Difficulty = 'medium'): number[] {
+  generateReverseSolvableGrid(
+    cols: number, 
+    rows: number, 
+    difficulty: Difficulty = 'medium',
+    removedIndices: Set<number> = new Set()
+  ): number[] {
     const total = cols * rows;
     const grid = new Array(total).fill(0);
-    const indices = Array.from({ length: total }, (_, i) => i);
+
+    // Mark pre-removed cells so they are not paired up or assigned values
+    for (const idx of removedIndices) {
+      grid[idx] = -1; // -1 represents a pre-removed/empty cell placeholder
+    }
+
+    const indices = Array.from({ length: total }, (_, i) => i)
+      .filter(i => !removedIndices.has(i));
 
     // Shuffle indices to grow from random clusters
     for (let i = indices.length - 1; i > 0; i--) {
@@ -389,6 +421,11 @@ export const GameEngine = {
       grid[emptyIndices[0]] = Math.floor(Math.random() * maxNum) + 1;
     }
 
+    // Restore -1 placeholders to 0
+    for (const idx of removedIndices) {
+      grid[idx] = 0;
+    }
+
     return grid;
   },
 
@@ -436,16 +473,46 @@ export const GameEngine = {
 
     let cells: Cell[] = [];
     let attempts = 0;
+    const totalCells = cols * initialRows;
 
     while (attempts < 50) {
       cells = [];
-      const totalCells = cols * initialRows;
-      const values = this.generateReverseSolvableGrid(cols, initialRows, difficulty);
+      const removedIndices = new Set<number>();
+
+      // 1. Determine pre-removed (empty/gap) cells first to ensure even active cells count
+      if (customLevel && customLevel.emptyCellsPercentage && customLevel.emptyCellsPercentage > 0) {
+        let countToRemove = Math.floor(totalCells * customLevel.emptyCellsPercentage);
+        let remainingCount = totalCells - countToRemove;
+        if (remainingCount % 2 !== 0) {
+          // Adjust to make sure remainingCount is even
+          countToRemove = Math.min(totalCells - 2, countToRemove + 1);
+        }
+
+        const candidates = Array.from({ length: totalCells }, (_, i) => i);
+        // Shuffle candidates to pick random cells to remove
+        for (let i = candidates.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const temp = candidates[i];
+          candidates[i] = candidates[j];
+          candidates[j] = temp;
+        }
+
+        for (let k = 0; k < countToRemove; k++) {
+          removedIndices.add(candidates[k]);
+        }
+      } else if (totalCells % 2 !== 0) {
+        // Odd total cells: pre-remove index 0 to ensure the remaining active cell count is even
+        removedIndices.add(0);
+      }
+
+      // 2. Generate reverse solvable grid on active cells only
+      const values = this.generateReverseSolvableGrid(cols, initialRows, difficulty, removedIndices);
 
       let portalGroupCounter = 1;
 
       for (let i = 0; i < totalCells; i++) {
-        const value = values[i];
+        const isRemoved = removedIndices.has(i);
+        const value = isRemoved ? 0 : values[i];
         let special: CellSpecial = 'none';
         let frozenCount = 0;
         let locked = false;
@@ -453,8 +520,8 @@ export const GameEngine = {
         let bombTimer: number | undefined;
         let portalGroup: number | undefined;
 
-        if (customLevel) {
-          // Handled post-generation to distribute exactly as configured
+        if (customLevel || isRemoved) {
+          // Handled post-generation to distribute exactly as configured or skip for removed cells
         } else if (mode === 'frozen') {
           if (Math.random() < 0.25) {
             special = 'frozen';
@@ -511,28 +578,12 @@ export const GameEngine = {
           multiplier,
           portalGroup,
           bombTimer,
-          removed: false
+          removed: isRemoved
         });
       }
 
+      // 3. Post-distribution of customLevel specialized obstacles and mystery cells on active cells
       if (customLevel) {
-        // 1. Initial Gaps (removed cells at start)
-        if (customLevel.emptyCellsPercentage && customLevel.emptyCellsPercentage > 0) {
-          const countToRemove = Math.floor(totalCells * customLevel.emptyCellsPercentage);
-          const removeCandidates = Array.from({ length: totalCells }, (_, i) => i);
-          for (let i = removeCandidates.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            const temp = removeCandidates[i];
-            removeCandidates[i] = removeCandidates[j];
-            removeCandidates[j] = temp;
-          }
-          for (let k = 0; k < countToRemove; k++) {
-            const rIdx = removeCandidates[k];
-            cells[rIdx].removed = true;
-          }
-        }
-
-        // 2. Specialized Obstacles placement on active cells
         const activeIndices = cells.map((c, idx) => ({ c, idx })).filter(item => !item.c.removed).map(item => item.idx);
         for (let i = activeIndices.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -594,7 +645,7 @@ export const GameEngine = {
           }
         }
 
-        // 3. Mystery cells placement (can be on any remaining active cell)
+        // Mystery cells placement (can be on any remaining active cell)
         if (customLevel.mysteryCellsCount && customLevel.mysteryCellsCount > 0) {
           const activeIndicesForMystery = cells.map((c, idx) => ({ c, idx })).filter(item => !item.c.removed).map(item => item.idx);
           for (let i = activeIndicesForMystery.length - 1; i > 0; i--) {
@@ -704,15 +755,17 @@ export const GameEngine = {
   },
 
   isValidBoard(cells: Cell[], cols: number, difficulty: Difficulty): boolean {
-    const activeCells = cells.filter(c => !c.removed);
+    const activeCells = cells.filter(c => !c.removed && c.value !== 0);
     if (activeCells.length === 0) return false;
 
+    // 1. Minimum number of starting matches
     const matches = this.findAllMoves(cells, cols);
     const minMatches = difficulty === 'easy' ? 6 : difficulty === 'medium' ? 4 : difficulty === 'hard' ? 3 : 2;
     if (matches.length < minMatches) {
       return false;
     }
 
+    // 2. Pairwise partner existence
     for (const cell of activeCells) {
       let hasPartner = false;
       for (const partner of activeCells) {
@@ -725,6 +778,27 @@ export const GameEngine = {
       }
       if (!hasPartner) {
         return false;
+      }
+    }
+
+    // 3. Perfect mathematical parity check of matching groups
+    const groupCounts: Record<string, number> = {};
+    for (const cell of activeCells) {
+      const v = cell.value;
+      let groupKey = '';
+      if (v === 5) {
+        groupKey = '5';
+      } else if (v < 10) {
+        groupKey = String(Math.min(v, 10 - v));
+      } else {
+        groupKey = `large-${v}`;
+      }
+      groupCounts[groupKey] = (groupCounts[groupKey] || 0) + 1;
+    }
+
+    for (const key in groupCounts) {
+      if (groupCounts[key] % 2 !== 0) {
+        return false; // Reject boards with odd elements in any matching group!
       }
     }
 

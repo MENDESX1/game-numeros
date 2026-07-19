@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GameMode, Difficulty, Cell, UserProfile, UserStats, GameConfig, GameMission, Achievement } from './types';
-import { THEMES, TRANSLATIONS, DEFAULT_ACHIEVEMENTS } from './config/gameConfig';
+import { THEMES, TRANSLATIONS, DEFAULT_ACHIEVEMENTS, SHOP_ITEMS } from './config/gameConfig';
 import { GameEngine } from './core/gameEngine';
 import { GameStorage } from './storage/db';
 import { HistorySystem } from "./core/historySystem";
@@ -417,8 +417,13 @@ export default function App() {
     setShowRestartConfirm(false);
     setShowExitConfirm(false);
     
-    // Set hints
-    setHintsLeft(selectedMode === 'relax' ? 999 : 3);
+    // Set hints with Bright Idea perk (+1 starting hint)
+    const baseHints = selectedMode === 'relax' ? 999 : 3;
+    const extraHints = (selectedMode !== 'relax' && profile.avatar === 'av_3') ? 1 : 0;
+    setHintsLeft(baseHints + extraHints);
+    if (extraHints > 0) {
+      setTimeout(() => showToast(`💡 Ideia Brilhante: +1 Dica Extra!`, 'success'), 400);
+    }
 
     // Set lives/mistakes and shuffles based on difficulty & mode
     let initialLives = 4;
@@ -440,6 +445,13 @@ export default function App() {
       } else if (selectedDiff === 'insane') {
         initialLives = 3;
         initialShuffles = 1;
+      }
+
+      // Vital Thruster perk (+1 extra life & +1 extra shuffle)
+      if (profile.avatar === 'av_5') {
+        initialLives += 1;
+        initialShuffles += 1;
+        setTimeout(() => showToast(`🚀 Propulsão Vital: +1 Vida e +1 Embaralhar!`, 'success'), 700);
       }
     }
 
@@ -477,7 +489,11 @@ export default function App() {
         setTimeLeft(levelRef.timeLimit);
       }
       if (levelRef?.movesLimit) {
-        setMovesLeft(levelRef.movesLimit);
+        const bonusMoves = profile.avatar === 'av_2' ? 2 : 0;
+        setMovesLeft(levelRef.movesLimit + bonusMoves);
+        if (bonusMoves > 0) {
+          setTimeout(() => showToast(`🧮 Mente Calculadora: +2 Jogadas!`, 'success'), 900);
+        }
       }
     }
 
@@ -560,6 +576,12 @@ export default function App() {
   ) => {
     const activeLeft = GameEngine.getActiveIndices(cellsLeft).length;
 
+    // 1. Unconditional instant victory: If the board is completely cleared of active numbers, the player wins!
+    if (activeLeft === 0) {
+      handleVictory(scoreVal);
+      return;
+    }
+
     // Challenge Level criteria
     if (levelId) {
       const lvl = CHALLENGE_LEVELS.find(l => l.id === levelId);
@@ -604,11 +626,13 @@ export default function App() {
         objectiveTargetMet = true;
       }
 
-      if (objectiveTargetMet && scoreTargetMet) {
-        handleVictory(scoreVal);
+      // If the player meets the primary objective of the campaign level, they win!
+      // We ensure they always pass by raising their final score to at least the level's target score if needed.
+      if (objectiveTargetMet) {
+        handleVictory(Math.max(scoreVal, lvl.targetScore));
       } else if (finalStep && GameEngine.checkVictory(cellsLeft)) {
-        // Clear board but targets missed
-        handleGameOver();
+        // Clear board but targets missed (fallback, though activeLeft === 0 already handled above)
+        handleVictory(Math.max(scoreVal, lvl.targetScore));
       }
       return;
     }
@@ -697,6 +721,12 @@ export default function App() {
     if (difficulty === 'medium') { coinReward = Math.floor(coinReward * 1.2); xpReward = Math.floor(xpReward * 1.2); }
     if (difficulty === 'hard') { coinReward = Math.floor(coinReward * 1.5); xpReward = Math.floor(xpReward * 1.5); }
     if (difficulty === 'insane') { coinReward = Math.floor(coinReward * 2); xpReward = Math.floor(xpReward * 2); }
+
+    // Number Mage (av_8) coin alchemy bônus (+25% moedas bônus!)
+    if (profile.avatar === 'av_8') {
+      coinReward = Math.floor(coinReward * 1.25);
+      setTimeout(() => showToast(`🧙‍♂️ Alquimia Dourada: +25% de Moedas Extras!`, 'success'), 1200);
+    }
 
     const nextProfile = { ...profile };
     nextProfile.coins += coinReward;
@@ -881,21 +911,47 @@ export default function App() {
         // Safely cleared bomb bonus
         let safeBombBonusScore = 0;
         if (result.isBombTriggered) {
-          safeBombBonusScore = 150;
-          // Earn 2 coins for safe detonation
-          const updatedProfile = { ...profile, coins: profile.coins + 2 };
+          // Dragon (av_6) gives double bomb explosion points!
+          safeBombBonusScore = profile.avatar === 'av_6' ? 300 : 150;
+          
+          // Dragon (av_6) gives double coins for safe detonations (4 instead of 2)!
+          const bombCoinsReward = profile.avatar === 'av_6' ? 4 : 2;
+          const updatedProfile = { ...profile, coins: profile.coins + bombCoinsReward };
           setProfile(updatedProfile);
           GameStorage.saveProfile(updatedProfile);
 
           const nextStats = { ...stats };
-          nextStats.totalCoinsEarned = (nextStats.totalCoinsEarned || 0) + 2;
+          nextStats.totalCoinsEarned = (nextStats.totalCoinsEarned || 0) + bombCoinsReward;
           setStats(nextStats);
           GameStorage.saveStats(nextStats);
 
-          GameStorage.updateMissionProgress('weekly_coins', 2);
-          GameStorage.updateMissionProgress('daily_earn_coins', 2);
+          GameStorage.updateMissionProgress('weekly_coins', bombCoinsReward);
+          GameStorage.updateMissionProgress('daily_earn_coins', bombCoinsReward);
           GameStorage.updateAchievementProgress('coins', updatedProfile.coins);
-          setProfile(GameStorage.getProfile());
+          
+          if (profile.avatar === 'av_6') {
+            showToast(`🐲 Fogo Destruidor: +${bombCoinsReward} Moedas!`, 'success');
+          }
+        }
+
+        // Joker (av_7) 10% chance for +10 coins on matching any pair!
+        if (profile.avatar === 'av_7' && Math.random() < 0.10) {
+          const jokerCoins = 10;
+          const nextProfileCoins = profile.coins + jokerCoins;
+          const updatedProfile = { ...profile, coins: nextProfileCoins };
+          setProfile(updatedProfile);
+          GameStorage.saveProfile(updatedProfile);
+
+          const nextStats = { ...stats };
+          nextStats.totalCoinsEarned = (nextStats.totalCoinsEarned || 0) + jokerCoins;
+          setStats(nextStats);
+          GameStorage.saveStats(nextStats);
+
+          GameStorage.updateMissionProgress('weekly_coins', jokerCoins);
+          GameStorage.updateMissionProgress('daily_earn_coins', jokerCoins);
+          GameStorage.updateAchievementProgress('coins', nextProfileCoins);
+          
+          showToast(`🃏 Coringa da Sorte: +10 Moedas!`, 'success');
         }
 
         const matchBase = cellA.value;
@@ -971,7 +1027,9 @@ export default function App() {
         const nextMaxCombo = Math.max(maxComboInLevel, combo + 1);
 
         // Reset Combo Timer (Multipliers Mode holds combo for 6 seconds, others 4 seconds)
-        const comboHoldTime = mode === 'multipliers' ? 6000 : 4000;
+        // Samurai (av_4) extends combo hold time by +2.0 seconds!
+        const bonusComboTime = profile.avatar === 'av_4' ? 2000 : 0;
+        const comboHoldTime = (mode === 'multipliers' ? 6000 : 4000) + bonusComboTime;
         if (comboTimeoutRef.current) clearTimeout(comboTimeoutRef.current);
         comboTimeoutRef.current = setTimeout(() => {
           setCombo(1);
@@ -1343,17 +1401,7 @@ export default function App() {
             <span>{profile.coins.toLocaleString()}</span>
           </div>
 
-          {/* Offline Indicator */}
-          {!isOnline && (
-            <div
-              id="offline-badge"
-              className="flex items-center gap-1.5 py-1 px-3 rounded-full border border-red-500/30 bg-red-500/10 text-[10px] font-bold text-red-500 dark:text-red-400 animate-pulse"
-              title="Modo Offline Ativo"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-              <span>OFFLINE</span>
-            </div>
-          )}
+
 
           {/* Settings button */}
           <button
@@ -1395,21 +1443,47 @@ export default function App() {
                     
                     {/* Left: Avatar & XP Info */}
                     <div className="sm:col-span-8 flex items-center gap-4">
-                      <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center text-3xl shrink-0 shadow-inner ${profile.frame} relative group transition-transform duration-300 hover:scale-105`}>
-                        {profile.avatar === 'av_1' ? '🧘' : profile.avatar === 'av_2' ? '🧮' : profile.avatar === 'av_3' ? '💡' : profile.avatar === 'av_4' ? '⚔️' : profile.avatar === 'av_5' ? '🚀' : profile.avatar === 'av_6' ? '🐲' : profile.avatar === 'av_7' ? '🃏' : '🧙‍♂️'}
-                        <div className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full bg-yellow-500 text-white text-[8px] font-mono font-bold uppercase tracking-wider shadow-md">
-                          LV {profile.level}
-                        </div>
-                      </div>
+                      {(() => {
+                        const activeFrameItem = SHOP_ITEMS.find(item => item.id === profile.frame && item.category === 'frame');
+                        const frameClasses = activeFrameItem?.previewImage || 'border-transparent';
+                        return (
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner relative group transition-transform duration-300 hover:scale-110 ${frameClasses}`}>
+                            {profile.avatar === 'av_1' ? '🧘' : profile.avatar === 'av_2' ? '🧮' : profile.avatar === 'av_3' ? '💡' : profile.avatar === 'av_4' ? '⚔️' : profile.avatar === 'av_5' ? '🚀' : profile.avatar === 'av_6' ? '🐲' : profile.avatar === 'av_7' ? '🃏' : '🧙‍♂️'}
+                            <div className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full bg-yellow-500 text-white text-[8px] font-mono font-bold uppercase tracking-wider shadow-md z-10">
+                              LV {profile.level}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline mb-1">
+                        <div className="flex justify-between items-baseline mb-0.5">
                           <span className={`text-base font-black uppercase tracking-wider ${activeTheme.textPrimary} flex items-center gap-1.5`}>
                             Logic Master
                             <Crown className="w-4 h-4 text-yellow-500 animate-pulse" />
                           </span>
                           <span className={`text-[10px] font-mono font-bold ${activeTheme.textSecondary}`}>XP {profile.xp} / {profile.level * 250}</span>
                         </div>
-                        <div className="w-full h-2 bg-current/10 rounded-full overflow-hidden p-[1px]">
+                        
+                        {/* Active Avatar Perk Info */}
+                        {(() => {
+                          const activeAvatar = SHOP_ITEMS.find(item => item.id === profile.avatar && item.category === 'avatar');
+                          const perkText = config.language === 'es' ? activeAvatar?.perkES : config.language === 'en' ? activeAvatar?.perkEN : activeAvatar?.perkPT;
+                          return activeAvatar ? (
+                            <div className="flex flex-col mb-1">
+                              <span className="text-[10px] font-extrabold text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                                <span>{activeAvatar.previewImage}</span>
+                                <span className="uppercase tracking-widest">{activeAvatar.nameKey}</span>
+                              </span>
+                              {perkText && (
+                                <p className={`text-[9px] opacity-75 leading-tight ${activeTheme.textSecondary}`}>
+                                  ⚡ {perkText}
+                                </p>
+                              )}
+                            </div>
+                          ) : null;
+                        })()}
+
+                        <div className="w-full h-1.5 bg-current/10 rounded-full overflow-hidden p-[1px]">
                           <motion.div 
                             className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full" 
                             initial={{ width: 0 }}
@@ -1450,9 +1524,6 @@ export default function App() {
                 {/* Glowing ambient background effect for title */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-12 rounded-full opacity-[0.08] blur-xl pointer-events-none" style={{ backgroundColor: activeTheme.accentColor }} />
                 
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-500/10 border border-yellow-500/30 text-[10px] font-mono tracking-widest uppercase font-black text-yellow-500 rounded-full mb-1">
-                  ⚡ PREMIUM ARCHITECTURE V2.5
-                </div>
                 <h2 className={`text-6xl font-black tracking-tighter leading-none ${activeTheme.textPrimary} flex items-center justify-center gap-1`}>
                   Logic<span style={{ color: activeTheme.accentColor }}>Match</span>
                 </h2>
@@ -1472,7 +1543,6 @@ export default function App() {
               <div className="flex flex-col gap-3">
                 {(() => {
                   const md = modeDetails[config.language as 'pt' | 'en' | 'es'] || modeDetails.en;
-                  const totalStars = Object.values(levelStars).reduce((acc: number, val: any) => acc + (typeof val === 'number' ? val : 0), 0);
                   
                   return (
                     <div className={`grid grid-cols-1 ${activeSavedGame ? 'sm:grid-cols-2' : 'grid-cols-1'} gap-4`}>
@@ -1481,14 +1551,13 @@ export default function App() {
                         <motion.button
                           id="resume-game-btn"
                           onClick={resumeGame}
-                          whileHover={{ y: -3, scale: 1.015 }}
-                          whileTap={{ scale: 0.985 }}
-                          className="p-5 rounded-2xl font-bold text-left cursor-pointer transition-all border border-orange-500/40 bg-gradient-to-br from-orange-500/20 via-orange-500/5 to-transparent relative overflow-hidden group shadow-md"
+                          whileHover={{ y: -2 }}
+                          whileTap={{ y: 2 }}
+                          className="p-5 rounded-2xl font-bold text-left cursor-pointer transition-all border-2 border-b-6 border-orange-500/40 bg-orange-500/5 hover:bg-orange-500/10 border-b-orange-600 relative overflow-hidden group shadow-md"
                         >
                           <div className="absolute right-3 top-3 opacity-15 group-hover:opacity-25 transition-opacity">
                             <Play className="w-12 h-12 fill-orange-500 text-orange-500" />
                           </div>
-                          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500 rounded-l-2xl" />
                           <div className="flex items-center gap-2 text-[10px] font-mono text-orange-500 uppercase tracking-widest mb-1 font-bold">
                             <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
                             <span>{config.language === 'pt' ? 'Partida Salva' : config.language === 'es' ? 'Partida Guardada' : 'Saved Game'}</span>
@@ -1509,18 +1578,17 @@ export default function App() {
                           SynthAudio.playClick(config.soundEnabled);
                           setView('levels');
                         }}
-                        whileHover={{ y: -3, scale: 1.015 }}
-                        whileTap={{ scale: 0.985 }}
-                        className={`p-5 rounded-2xl font-bold text-left cursor-pointer transition-all border relative overflow-hidden group shadow-md ${
+                        whileHover={{ y: -2 }}
+                        whileTap={{ y: 2 }}
+                        className={`p-5 rounded-2xl font-bold text-left cursor-pointer transition-all border-2 border-b-6 relative overflow-hidden group shadow-md ${
                           activeSavedGame 
-                            ? 'border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 via-yellow-500/5 to-transparent' 
-                            : 'border-yellow-500/60 bg-gradient-to-br from-yellow-500/20 via-yellow-500/5 to-transparent'
+                            ? 'border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10 border-b-yellow-600' 
+                            : 'border-yellow-500/50 bg-yellow-500/10 hover:bg-yellow-500/15 border-b-yellow-500'
                         }`}
                       >
                         <div className="absolute right-3 top-3 opacity-15 group-hover:opacity-25 transition-opacity">
                           <Star className="w-12 h-12 fill-yellow-500 text-yellow-500" />
                         </div>
-                        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500 rounded-l-2xl" />
                         <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-500 uppercase tracking-widest mb-1 font-bold">
                           <Crown className="w-3.5 h-3.5" />
                           <span>{config.language === 'pt' ? 'Mapa de Fases' : config.language === 'es' ? 'Mapa de Niveles' : 'Campaign Mode'}</span>
@@ -1556,14 +1624,13 @@ export default function App() {
                       <motion.button
                         id="play-classic-btn"
                         onClick={() => startNewGame('classic', 'medium')}
-                        whileHover={{ y: -3, scale: 1.015 }}
-                        whileTap={{ scale: 0.985 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border border-purple-500/20 bg-purple-500/[0.03] hover:bg-purple-500/[0.08] relative group overflow-hidden`}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ y: 2 }}
+                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-purple-500/20 bg-purple-500/[0.02] hover:bg-purple-500/[0.05] border-b-purple-600/50 relative group overflow-hidden`}
                       >
                         <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
                           <Play className="w-10 h-10 text-purple-500" />
                         </div>
-                        <div className="absolute left-0 top-0 bottom-0 w-1.2 bg-purple-500 rounded-l-2xl" />
                         <h5 className="text-sm font-black text-purple-500 uppercase tracking-wider mb-0.5">
                           {t.classic}
                         </h5>
@@ -1576,14 +1643,13 @@ export default function App() {
                       <motion.button
                         id="play-relax-btn"
                         onClick={() => startNewGame('relax', 'easy')}
-                        whileHover={{ y: -3, scale: 1.015 }}
-                        whileTap={{ scale: 0.985 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border border-emerald-500/20 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.08] relative group overflow-hidden`}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ y: 2 }}
+                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-emerald-500/20 bg-emerald-500/[0.02] hover:bg-emerald-500/[0.05] border-b-emerald-600/50 relative group overflow-hidden`}
                       >
                         <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
                           <Sparkles className="w-10 h-10 text-emerald-500" />
                         </div>
-                        <div className="absolute left-0 top-0 bottom-0 w-1.2 bg-emerald-500 rounded-l-2xl" />
                         <h5 className="text-sm font-black text-emerald-500 uppercase tracking-wider mb-0.5">
                           {t.relax}
                         </h5>
@@ -1596,14 +1662,13 @@ export default function App() {
                       <motion.button
                         id="play-timed-btn"
                         onClick={() => startNewGame('timed', 'hard')}
-                        whileHover={{ y: -3, scale: 1.015 }}
-                        whileTap={{ scale: 0.985 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border border-sky-500/20 bg-sky-500/[0.03] hover:bg-sky-500/[0.08] relative group overflow-hidden`}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ y: 2 }}
+                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-sky-500/20 bg-sky-500/[0.02] hover:bg-sky-500/[0.05] border-b-sky-600/50 relative group overflow-hidden`}
                       >
                         <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
                           <Clock className="w-10 h-10 text-sky-500" />
                         </div>
-                        <div className="absolute left-0 top-0 bottom-0 w-1.2 bg-sky-500 rounded-l-2xl" />
                         <h5 className="text-sm font-black text-sky-500 uppercase tracking-wider mb-0.5">
                           {t.timed}
                         </h5>
@@ -1616,14 +1681,13 @@ export default function App() {
                       <motion.button
                         id="play-survival-btn"
                         onClick={() => startNewGame('survival', 'hard')}
-                        whileHover={{ y: -3, scale: 1.015 }}
-                        whileTap={{ scale: 0.985 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border border-rose-500/20 bg-rose-500/[0.03] hover:bg-rose-500/[0.08] relative group overflow-hidden`}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ y: 2 }}
+                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-rose-500/20 bg-rose-500/[0.02] hover:bg-rose-500/[0.05] border-b-rose-600/50 relative group overflow-hidden`}
                       >
                         <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
                           <Flame className="w-10 h-10 text-rose-500" />
                         </div>
-                        <div className="absolute left-0 top-0 bottom-0 w-1.2 bg-rose-500 rounded-l-2xl" />
                         <h5 className="text-sm font-black text-rose-500 uppercase tracking-wider mb-0.5">
                           {t.survival}
                         </h5>
@@ -1636,14 +1700,13 @@ export default function App() {
                       <motion.button
                         id="play-infinite-btn"
                         onClick={() => startNewGame('infinite', 'hard')}
-                        whileHover={{ y: -3, scale: 1.015 }}
-                        whileTap={{ scale: 0.985 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border border-indigo-500/20 bg-indigo-500/[0.03] hover:bg-indigo-500/[0.08] relative col-span-1 sm:col-span-2 group overflow-hidden`}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ y: 2 }}
+                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-indigo-500/20 bg-indigo-500/[0.02] hover:bg-indigo-500/[0.05] border-b-indigo-600/50 relative col-span-1 sm:col-span-2 group overflow-hidden`}
                       >
                         <div className="absolute right-4 top-3.5 opacity-10 group-hover:opacity-20 transition-opacity">
                           <Infinity className="w-10 h-10 text-indigo-500" />
                         </div>
-                        <div className="absolute left-0 top-0 bottom-0 w-1.2 bg-indigo-500 rounded-l-2xl" />
                         <h5 className="text-sm font-black text-indigo-500 uppercase tracking-wider mb-0.5">
                           {t.infinite}
                         </h5>
