@@ -393,8 +393,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 
         {/* Survival Tick countdown */}
         {(mode === 'survival' || mode === 'infinite') && (
-          <div className={`p-2.5 rounded-xl border col-span-2 flex items-center justify-between px-3 ${themeStyles.itemBg}`}>
-            <span className={`text-[9px] uppercase tracking-wider font-bold flex items-center gap-1 ${themeStyles.textSecondary}`}>
+          <div className={`p-2.5 rounded-xl border ${mode === 'survival' ? 'col-span-1 flex-col justify-center' : 'col-span-2 flex-row justify-between px-3'} flex items-center text-center ${themeStyles.itemBg}`}>
+            <span className={`text-[9px] uppercase tracking-wider font-bold flex items-center gap-1 ${mode === 'survival' ? 'mb-1' : ''} ${themeStyles.textSecondary}`}>
               <Sparkles className="w-3.5 h-3.5 text-blue-500" />
               {getLabel('next_line')}
             </span>

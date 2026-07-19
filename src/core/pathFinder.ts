@@ -61,25 +61,16 @@ export class PathFinder {
     const r2 = Math.floor(maxIdx / cols);
     const c2 = maxIdx % cols;
 
-    if (showDebugLogs) {
-      console.log(`[PathFinder] Verificando conexão: A(idx:${idxA}, v:${cells[idxA].value}, r:${Math.floor(idxA / cols)}, c:${idxA % cols}) -> B(idx:${idxB}, v:${cells[idxB].value}, r:${Math.floor(idxB / cols)}, c:${idxB % cols})`);
-    }
-
     // --- 1. Same Row Check (Horizontal) ---
     if (r1 === r2) {
       let isBlocked = false;
-      let blockerInfo = '';
       // Check all intermediate columns on the same row. Only active numbers block.
       for (let c = c1 + 1; c < c2; c++) {
         const checkIdx = r1 * cols + c;
         if (this.isActive(cells[checkIdx])) {
           isBlocked = true;
-          blockerInfo = `idx:${checkIdx}, v:${cells[checkIdx].value}`;
           break;
         }
-      }
-      if (showDebugLogs) {
-        console.log(`  - Caminho Horizontal: ${isBlocked ? `BLOQUEADO por ${blockerInfo}` : 'LIVRE'}`);
       }
       if (!isBlocked) return true;
     }
@@ -87,27 +78,47 @@ export class PathFinder {
     // --- 2. Same Column Check (Vertical) ---
     if (c1 === c2) {
       let isBlocked = false;
-      let blockerInfo = '';
       // Check all intermediate rows in the same column. Only active numbers block.
       for (let r = r1 + 1; r < r2; r++) {
         const checkIdx = r * cols + c1;
         if (this.isActive(cells[checkIdx])) {
           isBlocked = true;
-          blockerInfo = `idx:${checkIdx}, v:${cells[checkIdx].value}`;
           break;
         }
-      }
-      if (showDebugLogs) {
-        console.log(`  - Caminho Vertical: ${isBlocked ? `BLOQUEADO por ${blockerInfo}` : 'LIVRE'}`);
       }
       if (!isBlocked) return true;
     }
 
-    // --- 3. Removed Diagonal, 1D, and BFS path logic due to user rules. ---
-
-    if (showDebugLogs) {
-      console.log(`[PathFinder] Resultado: SEM CONEXÃO POSSÍVEL`);
+    // --- 3. Straight Diagonal Check ---
+    if (Math.abs(r1 - r2) === Math.abs(c1 - c2)) {
+      const stepRow = 1; // Since minIdx has lower row than maxIdx, r1 < r2 is guaranteed
+      const stepCol = c1 < c2 ? 1 : -1;
+      let currRow = r1 + stepRow;
+      let currCol = c1 + stepCol;
+      let isBlocked = false;
+      while (currRow !== r2) {
+        const checkIdx = currRow * cols + currCol;
+        if (this.isActive(cells[checkIdx])) {
+          isBlocked = true;
+          break;
+        }
+        currRow += stepRow;
+        currCol += stepCol;
+      }
+      if (!isBlocked) return true;
     }
+
+    // --- 4. 1D Sequential / Reading Order Check ---
+    // If all cells between minIdx and maxIdx are inactive, they are consecutive in 1D reading order.
+    let is1DBlocked = false;
+    for (let idx = minIdx + 1; idx < maxIdx; idx++) {
+      if (this.isActive(cells[idx])) {
+        is1DBlocked = true;
+        break;
+      }
+    }
+    if (!is1DBlocked) return true;
+
     return false;
   }
 

@@ -311,13 +311,6 @@ export default function App() {
               // Limit removed, no game over
               return withLine;
             });
-            
-            setTimeout(() => {
-              const container = document.getElementById('app-container');
-              if (container) {
-                container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-              }
-            }, 100);
 
             return mode === 'infinite' ? 20 : 12; // Reset countdown (20 seconds for infinite)
           }
@@ -463,7 +456,10 @@ export default function App() {
 
     // Dynamic Board initialization
     const boardMode = challengeId ? getChallengeBaseMode(challengeId) : selectedMode;
-    const { cells: initialCells, cols: initialCols } = GameEngine.generateInitialBoard(boardMode, selectedDiff, profile.level);
+    const levelSizeParam = challengeId 
+      ? Math.floor(4 + challengeId * 0.3) // Level 1 is 4, Level 10 is 7, Level 20 is 10, Level 30 is 13 (massive grid!)
+      : profile.level;
+    const { cells: initialCells, cols: initialCols } = GameEngine.generateInitialBoard(boardMode, selectedDiff, levelSizeParam);
     setCells(initialCells);
     setCols(initialCols);
 
@@ -491,9 +487,10 @@ export default function App() {
 
   // Maps custom level constraints to physical base generator layouts
   const getChallengeBaseMode = (lvlId: number): GameMode => {
-    if (lvlId === 1 || lvlId === 6) return 'frozen';
-    if (lvlId === 4 || lvlId === 9) return 'locks';
-    if (lvlId === 3 || lvlId === 8) return 'bombs';
+    if ([1, 6, 11, 18, 24, 27].includes(lvlId)) return 'frozen';
+    if ([4, 9, 17, 19, 23, 27].includes(lvlId)) return 'locks';
+    if ([3, 8, 16, 18, 25, 28].includes(lvlId)) return 'bombs';
+    if (lvlId === 21) return 'multipliers';
     return 'classic';
   };
 
@@ -644,7 +641,7 @@ export default function App() {
       setLevelStars(nextStars);
       localStorage.setItem('numzen_challenge_stars', JSON.stringify(nextStars));
 
-      if (levelId === currentLevelUnlocked && levelId < 15) {
+      if (levelId === currentLevelUnlocked && levelId < CHALLENGE_LEVELS.length) {
         const nextLvl = levelId + 1;
         setCurrentLevelUnlocked(nextLvl);
         localStorage.setItem('numzen_challenge_milestone', nextLvl.toString());
@@ -1037,7 +1034,11 @@ export default function App() {
         } else if (mode === 'survival') {
           setLives(prev => {
             const nextLives = prev - 1;
-            // Game over removed
+            if (nextLives <= 0) {
+              setTimeout(() => {
+                handleGameOver();
+              }, 10);
+            }
             return nextLives;
           });
         }

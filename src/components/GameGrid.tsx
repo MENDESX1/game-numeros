@@ -159,21 +159,38 @@ export const GameGrid: React.FC<GameGridProps> = React.memo(({
           }
 
           // Generate custom cell styles depending on special items and visibility
+          const isLightTheme = ['aurelius', 'minimalist', 'wood'].includes(themeStyles.id);
           let cellStyle = themeStyles.cellBg;
           if (!isRevealed) {
-            cellStyle = 'bg-slate-950 border-slate-900/40 text-slate-700 hover:border-slate-800 opacity-80 cursor-pointer';
+            cellStyle = isLightTheme
+              ? 'bg-zinc-300 border-zinc-400/40 text-zinc-500 hover:border-zinc-500 opacity-80 cursor-pointer'
+              : 'bg-slate-950 border-slate-900/40 text-slate-700 hover:border-slate-800 opacity-80 cursor-pointer';
           } else if (cell.special === 'frozen') {
-            cellStyle = cell.frozenCount > 1 
-              ? 'bg-blue-950/20 border-blue-500/50 text-[#f5f2ed] hover:border-blue-400' 
-              : 'bg-blue-950/10 border-blue-400/30 text-[#f5f2ed] hover:border-blue-300';
+            if (isLightTheme) {
+              cellStyle = cell.frozenCount > 1 
+                ? 'bg-blue-100 border-blue-400 text-blue-900 font-bold hover:border-blue-600' 
+                : 'bg-blue-50 border-blue-300 text-blue-800 font-bold hover:border-blue-500';
+            } else {
+              cellStyle = cell.frozenCount > 1 
+                ? 'bg-blue-950/20 border-blue-500/50 text-[#f5f2ed] hover:border-blue-400' 
+                : 'bg-blue-950/10 border-blue-400/30 text-[#f5f2ed] hover:border-blue-300';
+            }
           } else if (cell.special === 'locked') {
-            cellStyle = 'bg-gray-900 border-yellow-700/30 text-gray-500 cursor-not-allowed';
+            cellStyle = isLightTheme
+              ? 'bg-zinc-200 border-amber-600/30 text-zinc-400 cursor-not-allowed'
+              : 'bg-gray-900 border-yellow-700/30 text-gray-500 cursor-not-allowed';
           } else if (cell.special === 'bomb') {
-            cellStyle = 'bg-red-950/20 border-red-500/30 text-red-100 hover:border-red-400';
+            cellStyle = isLightTheme
+              ? 'bg-red-100 border-red-300 text-red-900 font-bold hover:border-red-500'
+              : 'bg-red-950/20 border-red-500/30 text-red-100 hover:border-red-400';
           } else if (cell.special === 'multiplier') {
-            cellStyle = 'bg-yellow-950/10 border-yellow-500/30 text-yellow-100 hover:border-yellow-400';
+            cellStyle = isLightTheme
+              ? 'bg-amber-100 border-amber-300 text-amber-950 font-bold hover:border-amber-500'
+              : 'bg-yellow-950/10 border-yellow-500/30 text-yellow-100 hover:border-yellow-400';
           } else if (cell.special === 'portal') {
-            cellStyle = 'bg-purple-950/20 border-purple-500/30 text-purple-100 hover:border-purple-400';
+            cellStyle = isLightTheme
+              ? 'bg-purple-100 border-purple-300 text-purple-900 font-bold hover:border-purple-500'
+              : 'bg-purple-950/20 border-purple-500/30 text-purple-100 hover:border-purple-400';
           }
 
           let dynamicStyle: React.CSSProperties = {};
