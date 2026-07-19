@@ -1,5 +1,5 @@
 import { PathFinder } from "./pathFinder";
-import { Cell, CellSpecial, GameMode, Difficulty } from '../types';
+import { Cell, CellSpecial, GameMode, Difficulty, ChallengeLevel } from '../types';
 
 export const GameEngine = {
   // --- Core Utility Functions ---
@@ -392,41 +392,46 @@ export const GameEngine = {
     return grid;
   },
 
-  generateInitialBoard(mode: GameMode, difficulty: Difficulty, userLevel: number = 1): { cells: Cell[]; cols: number } {
+  generateInitialBoard(mode: GameMode, difficulty: Difficulty, userLevel: number = 1, customLevel?: ChallengeLevel): { cells: Cell[]; cols: number } {
     let cols = 9;
     let initialRows = 12;
 
-    // Difficulty base
-    if (difficulty === 'easy') {
-      initialRows = 10;
-    } else if (difficulty === 'medium') {
-      initialRows = 12;
-    } else if (difficulty === 'hard') {
-      initialRows = 14;
-    } else if (difficulty === 'insane') {
-      initialRows = 16;
-    }
+    if (customLevel) {
+      cols = customLevel.cols;
+      initialRows = customLevel.rows;
+    } else {
+      // Difficulty base
+      if (difficulty === 'easy') {
+        initialRows = 10;
+      } else if (difficulty === 'medium') {
+        initialRows = 12;
+      } else if (difficulty === 'hard') {
+        initialRows = 14;
+      } else if (difficulty === 'insane') {
+        initialRows = 16;
+      }
 
-    // Level-based progression (different layouts)
-    if (userLevel === 1) {
-      initialRows = 6;
-      cols = 6;
-    } else if (userLevel === 2) {
-      initialRows = 8;
-      cols = 7;
-    } else if (userLevel === 3) {
-      initialRows = 9;
-      cols = 8;
-    } else if (userLevel === 4) {
-      initialRows = 10;
-      cols = 9;
-    } else if (userLevel >= 5 && userLevel <= 10) {
-      initialRows = 10 + Math.floor(userLevel / 2);
-      cols = 9;
-    } else if (userLevel > 10) {
-      // Very high levels
-      initialRows = 15 + Math.floor(userLevel / 3);
-      cols = 10;
+      // Level-based progression (different layouts)
+      if (userLevel === 1) {
+        initialRows = 6;
+        cols = 6;
+      } else if (userLevel === 2) {
+        initialRows = 8;
+        cols = 7;
+      } else if (userLevel === 3) {
+        initialRows = 9;
+        cols = 8;
+      } else if (userLevel === 4) {
+        initialRows = 10;
+        cols = 9;
+      } else if (userLevel >= 5 && userLevel <= 10) {
+        initialRows = 10 + Math.floor(userLevel / 2);
+        cols = 9;
+      } else if (userLevel > 10) {
+        // Very high levels
+        initialRows = 15 + Math.floor(userLevel / 3);
+        cols = 10;
+      }
     }
 
     let cells: Cell[] = [];
@@ -448,7 +453,9 @@ export const GameEngine = {
         let bombTimer: number | undefined;
         let portalGroup: number | undefined;
 
-        if (mode === 'frozen') {
+        if (customLevel) {
+          // Handled post-generation to distribute exactly as configured
+        } else if (mode === 'frozen') {
           if (Math.random() < 0.25) {
             special = 'frozen';
             frozenCount = Math.random() < 0.35 ? 2 : 1;
@@ -506,6 +513,103 @@ export const GameEngine = {
           bombTimer,
           removed: false
         });
+      }
+
+      if (customLevel) {
+        // 1. Initial Gaps (removed cells at start)
+        if (customLevel.emptyCellsPercentage && customLevel.emptyCellsPercentage > 0) {
+          const countToRemove = Math.floor(totalCells * customLevel.emptyCellsPercentage);
+          const removeCandidates = Array.from({ length: totalCells }, (_, i) => i);
+          for (let i = removeCandidates.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const temp = removeCandidates[i];
+            removeCandidates[i] = removeCandidates[j];
+            removeCandidates[j] = temp;
+          }
+          for (let k = 0; k < countToRemove; k++) {
+            const rIdx = removeCandidates[k];
+            cells[rIdx].removed = true;
+          }
+        }
+
+        // 2. Specialized Obstacles placement on active cells
+        const activeIndices = cells.map((c, idx) => ({ c, idx })).filter(item => !item.c.removed).map(item => item.idx);
+        for (let i = activeIndices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const temp = activeIndices[i];
+          activeIndices[i] = activeIndices[j];
+          activeIndices[j] = temp;
+        }
+
+        let obsIdx = 0;
+        const obstacles = customLevel.specialObstacles || {};
+
+        if (obstacles.frozen && obstacles.frozen > 0) {
+          const limit = Math.min(obstacles.frozen, activeIndices.length - obsIdx);
+          for (let k = 0; k < limit; k++) {
+            const targetIdx = activeIndices[obsIdx++];
+            cells[targetIdx].special = 'frozen';
+            cells[targetIdx].frozenCount = 1;
+          }
+        }
+
+        if (obstacles.locked && obstacles.locked > 0) {
+          const limit = Math.min(obstacles.locked, activeIndices.length - obsIdx);
+          for (let k = 0; k < limit; k++) {
+            const targetIdx = activeIndices[obsIdx++];
+            cells[targetIdx].special = 'locked';
+            cells[targetIdx].locked = true;
+          }
+        }
+
+        if (obstacles.bombs && obstacles.bombs > 0) {
+          const limit = Math.min(obstacles.bombs, activeIndices.length - obsIdx);
+          for (let k = 0; k < limit; k++) {
+            const targetIdx = activeIndices[obsIdx++];
+            cells[targetIdx].special = 'bomb';
+            cells[targetIdx].bombTimer = Math.floor(Math.random() * 6) + 10;
+          }
+        }
+
+        if (obstacles.multipliers && obstacles.multipliers > 0) {
+          const limit = Math.min(obstacles.multipliers, activeIndices.length - obsIdx);
+          for (let k = 0; k < limit; k++) {
+            const targetIdx = activeIndices[obsIdx++];
+            cells[targetIdx].special = 'multiplier';
+            cells[targetIdx].multiplier = 2;
+          }
+        }
+
+        if (obstacles.portals && obstacles.portals > 0) {
+          const limitPairs = Math.min(obstacles.portals, Math.floor((activeIndices.length - obsIdx) / 2));
+          let portalGrp = 1;
+          for (let p = 0; p < limitPairs; p++) {
+            const idx1 = activeIndices[obsIdx++];
+            const idx2 = activeIndices[obsIdx++];
+            cells[idx1].special = 'portal';
+            cells[idx1].portalGroup = portalGrp;
+            cells[idx2].special = 'portal';
+            cells[idx2].portalGroup = portalGrp;
+            portalGrp++;
+          }
+        }
+
+        // 3. Mystery cells placement (can be on any remaining active cell)
+        if (customLevel.mysteryCellsCount && customLevel.mysteryCellsCount > 0) {
+          const activeIndicesForMystery = cells.map((c, idx) => ({ c, idx })).filter(item => !item.c.removed).map(item => item.idx);
+          for (let i = activeIndicesForMystery.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const temp = activeIndicesForMystery[i];
+            activeIndicesForMystery[i] = activeIndicesForMystery[j];
+            activeIndicesForMystery[j] = temp;
+          }
+          const limit = Math.min(customLevel.mysteryCellsCount, activeIndicesForMystery.length);
+          for (let k = 0; k < limit; k++) {
+            const targetIdx = activeIndicesForMystery[k];
+            cells[targetIdx].mystery = true;
+            cells[targetIdx].revealed = false;
+          }
+        }
       }
 
       const portals = cells.filter(c => c.special === 'portal');

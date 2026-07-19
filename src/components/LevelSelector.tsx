@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GameConfig } from '../types';
+import { GameConfig, ChallengeLevel } from '../types';
 import { TRANSLATIONS } from '../config/gameConfig';
 import { 
   Lock, 
@@ -17,244 +17,464 @@ import {
 import { SynthAudio } from '../audio/synth';
 import { motion } from 'motion/react';
 
-interface ChallengeLevel {
-  id: number;
-  titleKey: string;
-  descKey: string;
-  targetScore: number;
-  movesLimit?: number;
-  timeLimit?: number;
-  specialCondition?: {
-    type: 'ice' | 'locks' | 'bombs' | 'score' | 'no_hints' | 'no_duplicates' | 'combo_streak' | 'cleared_numbers' | 'supreme_zen';
-    count: number;
-  };
-}
-
 export const CHALLENGE_LEVELS: ChallengeLevel[] = [
   { 
     id: 1, 
-    titleKey: 'Fase 1: Descongelar', 
-    descKey: 'Bem-vindo ao mapa! Derreta 4 blocos de gelo combinando os números adjacentes ou idênticos.', 
-    targetScore: 500, 
-    specialCondition: { type: 'ice', count: 4 } 
+    titlePT: 'Fase 1: Introdução Suave', 
+    titleEN: 'Stage 1: Gentle Intro', 
+    titleES: 'Nivel 1: Introducción Suave', 
+    descPT: 'Bem-vindo! Combine pares de números idênticos ou que somam 10 para atingir a meta básica.', 
+    descEN: 'Welcome! Match pairs of identical numbers or those that sum to 10 to reach the basic goal.', 
+    descES: '¡Bienvenido! Empareja números idénticos o que sumen 10 para alcanzar el objetivo básico.', 
+    cols: 5, 
+    rows: 5, 
+    targetScore: 300, 
+    movesLimit: 25, 
+    objective: { type: 'pairs', count: 5 } 
   },
   { 
     id: 2, 
-    titleKey: 'Fase 2: Corrida Numérica', 
-    descKey: 'O relógio está correndo! Alcance 1.200 pontos antes que o tempo de 60 segundos se esgote.', 
-    targetScore: 1200, 
-    timeLimit: 60, 
-    specialCondition: { type: 'score', count: 1200 } 
+    titlePT: 'Fase 2: Toque de Gelo', 
+    titleEN: 'Stage 2: Ice Touch', 
+    titleES: 'Nivel 2: Toque de Hielo', 
+    descPT: 'Derreta 3 blocos de gelo combinando números adjacentes a eles ou as próprias células congeladas.', 
+    descEN: 'Melt 3 ice blocks by matching numbers adjacent to them or the frozen cells themselves.', 
+    descES: 'Derrite 3 bloques de hielo combinando números adyacentes a ellos o las propias celdas congeladas.', 
+    cols: 5, 
+    rows: 6, 
+    targetScore: 500, 
+    movesLimit: 30, 
+    specialObstacles: { frozen: 3 }, 
+    objective: { type: 'ice', count: 3 } 
   },
   { 
     id: 3, 
-    titleKey: 'Fase 3: Desarmar Bombas', 
-    descKey: 'Cuidado! 5 bombas estão ativas no tabuleiro. Elimine-as antes que explodam e causem estragos!', 
-    targetScore: 1000, 
-    specialCondition: { type: 'bombs', count: 5 } 
+    titlePT: 'Fase 3: O Mistério Começa', 
+    titleEN: 'Stage 3: Mystery Begins', 
+    titleES: 'Nivel 3: Comienza el Misterio', 
+    descPT: 'Algumas casas estão escondidas! Toque nelas para revelar o número e seus vizinhos imediatos.', 
+    descEN: 'Some cells are hidden! Tap them to reveal their number and their immediate neighbors.', 
+    descES: '¡Algunas celdas están ocultas! Tócalas para revelar su número y sus vecinos inmediatos.', 
+    cols: 6, 
+    rows: 6, 
+    targetScore: 800, 
+    movesLimit: 30, 
+    mysteryCellsCount: 4, 
+    objective: { type: 'score', count: 800 } 
   },
   { 
     id: 4, 
-    titleKey: 'Fase 4: Chave do Enigma', 
-    descKey: 'Abra 6 cadeados combinando números vizinhos para liberar as peças travadas.', 
-    targetScore: 1500, 
-    specialCondition: { type: 'locks', count: 6 } 
+    titlePT: 'Fase 4: Chave e Cadeado', 
+    titleEN: 'Stage 4: Lock and Key', 
+    titleES: 'Nivel 4: Llave y Candado', 
+    descPT: 'Abra 4 cadeados fazendo combinações adjacentes a eles para libertar as peças travadas.', 
+    descEN: 'Unlock 4 padlocks by making adjacent matches to free the locked numbers.', 
+    descES: 'Desbloquea 4 candados haciendo combinaciones adyacentes a ellos para liberar los números trabados.', 
+    cols: 6, 
+    rows: 6, 
+    targetScore: 1000, 
+    movesLimit: 30, 
+    specialObstacles: { locked: 4 }, 
+    objective: { type: 'locks', count: 4 } 
   },
   { 
     id: 5, 
-    titleKey: 'Fase 5: Economia Tática', 
-    descKey: 'Pense antes de agir! Alcance 2.500 pontos usando no máximo 35 movimentos planejados.', 
-    targetScore: 2500, 
-    movesLimit: 35 
+    titlePT: 'Fase 5: Conexão Dez', 
+    titleEN: 'Stage 5: Ten Connection', 
+    titleES: 'Nivel 5: Conexión Diez', 
+    descPT: 'Aprenda a focar na soma dez! Remova 8 pares que somam exatamente 10 neste tabuleiro esticado.', 
+    descEN: 'Learn to focus on the sum of ten! Remove 8 pairs that sum to exactly 10 on this stretched board.', 
+    descES: '¡Aprende a enfocarte en la suma de diez! Elimina 8 parejas que sumen exactamente 10 en este tablero.', 
+    cols: 6, 
+    rows: 7, 
+    targetScore: 1200, 
+    movesLimit: 35, 
+    objective: { type: 'sum_ten', count: 8 } 
   },
   { 
     id: 6, 
-    titleKey: 'Fase 6: Geada Severa', 
-    descKey: 'A temperatura caiu drasticamente! Derreta 10 blocos de gelo e pontue pelo menos 3.000.', 
-    targetScore: 3000, 
-    specialCondition: { type: 'ice', count: 10 } 
+    titlePT: 'Fase 6: Fusível Quente', 
+    titleEN: 'Stage 6: Hot Fuse', 
+    titleES: 'Nivel 6: Fusible Caliente', 
+    descPT: 'Cuidado! 3 bombas relógio estão ativas. Combine-as antes que seu timer zere e cause danos!', 
+    descEN: 'Watch out! 3 active time bombs are on the grid. Match them before their timer hits zero!', 
+    descES: '¡Cuidado! 3 bombas de tiempo están activas. ¡Emparéjalas antes de que su temporizador llegue a cero!', 
+    cols: 6, 
+    rows: 7, 
+    targetScore: 1500, 
+    timeLimit: 90, 
+    specialObstacles: { bombs: 3 }, 
+    objective: { type: 'bombs', count: 3 } 
   },
   { 
     id: 7, 
-    titleKey: 'Fase 7: Sob Pressão', 
-    descKey: 'Raciocínio ultrarrápido exigido: faça 4.000 pontos em apenas 80 segundos.', 
-    targetScore: 4000, 
-    timeLimit: 80 
+    titlePT: 'Fase 7: Espaço Vazio', 
+    titleEN: 'Stage 7: Empty Space', 
+    titleES: 'Nivel 7: Espacio Vacío', 
+    descPT: 'O tabuleiro começa com 15% de espaços vazios. Encontre caminhos por cima dessas lacunas!', 
+    descEN: 'The board starts with 15% empty spaces. Find matching paths across these gaps!', 
+    descES: 'El tablero comienza con un 15% de espacios vacíos. ¡Encuentra caminos sobre estas brechas!', 
+    cols: 7, 
+    rows: 7, 
+    targetScore: 1800, 
+    movesLimit: 40, 
+    emptyCellsPercentage: 0.15, 
+    objective: { type: 'clear_board', count: 1 } 
   },
   { 
     id: 8, 
-    titleKey: 'Fase 8: Campo Crítico', 
-    descKey: 'Oito bombas voláteis espalhadas no tabuleiro! Neutralize todas e chegue a 5.000 pontos.', 
-    targetScore: 5000, 
-    specialCondition: { type: 'bombs', count: 8 } 
+    titlePT: 'Fase 8: Coleção de Setes', 
+    titleEN: 'Stage 8: Lucky Sevens', 
+    titleES: 'Nivel 8: Colección de Sietes', 
+    descPT: 'Foco absoluto! Você precisa remover pelo menos 8 pares do número 7 para concluir a fase.', 
+    descEN: 'Absolute focus! You need to remove at least 8 pairs of the number 7 to clear the stage.', 
+    descES: '¡Enfoque absoluto! Debes eliminar al menos 8 parejas del número 7 para completar el nivel.', 
+    cols: 7, 
+    rows: 7, 
+    targetScore: 2000, 
+    movesLimit: 35, 
+    mysteryCellsCount: 3, 
+    objective: { type: 'same_number', count: 8, targetValue: 7 } 
   },
   { 
     id: 9, 
-    titleKey: 'Fase 9: Cadeado Imperial', 
-    descKey: 'Destranque 12 cadeados para libertar todo o fluxo de combinações da grade.', 
-    targetScore: 6000, 
-    specialCondition: { type: 'locks', count: 12 } 
+    titlePT: 'Fase 9: Congelamento Severo', 
+    titleEN: 'Stage 9: Severe Freeze', 
+    titleES: 'Nivel 9: Congelación Severa', 
+    descPT: 'O inverno chegou! Derreta os 6 blocos de gelo espalhados antes que você fique sem jogadas.', 
+    descEN: 'Winter is here! Melt all 6 scattered ice blocks before running out of available moves.', 
+    descES: '¡El invierno está aquí! Derrite los 6 bloques de hielo antes de quedarte sin movimientos.', 
+    cols: 7, 
+    rows: 8, 
+    targetScore: 2500, 
+    movesLimit: 40, 
+    specialObstacles: { frozen: 6 }, 
+    objective: { type: 'ice', count: 6 } 
   },
   { 
     id: 10, 
-    titleKey: 'Fase 10: Avalanche de Dígitos', 
-    descKey: 'Um tabuleiro gigante com dezenas de números! Alcance 8.000 pontos em até 50 jogadas.', 
-    targetScore: 8000, 
-    movesLimit: 50 
+    titlePT: 'Fase 10: Nevoeiro Intenso', 
+    titleEN: 'Stage 10: Thick Fog', 
+    titleES: 'Nivel 10: Niebla Densa', 
+    descPT: 'Dez casas misteriosas cobrem o tabuleiro! Toque com cautela para desvendar os caminhos ocultos.', 
+    descEN: 'Ten mystery cells cover the board! Tap cautiously to unveil the hidden pairing paths.', 
+    descES: '¡Diez celdas misteriosas cubren el tablero! Toca con cuidado para revelar los caminos ocultos.', 
+    cols: 8, 
+    rows: 8, 
+    targetScore: 3000, 
+    movesLimit: 45, 
+    mysteryCellsCount: 10, 
+    objective: { type: 'score', count: 3000 } 
   },
   { 
     id: 11, 
-    titleKey: 'Fase 11: Inverno Rigoroso', 
-    descKey: 'Derreta 16 blocos de gelo espessos em apenas 45 jogadas. O espaço ficará apertado!', 
+    titlePT: 'Fase 11: Multiplicadores Ativos', 
+    titleEN: 'Stage 11: Active Multipliers', 
+    titleES: 'Nivel 11: Multiplicadores Activos', 
+    descPT: 'Células douradas multiplicam os pontos de suas combinações. Use-as para bater os 4.000 pontos!', 
+    descEN: 'Golden cells multiply your match scores. Utilize them strategicially to beat 4,000 points!', 
+    descES: 'Las celdas doradas multiplican los puntos de tus parejas. ¡Úsalas para superar los 4,000 puntos!', 
+    cols: 8, 
+    rows: 8, 
     targetScore: 4000, 
-    movesLimit: 45,
-    specialCondition: { type: 'ice', count: 16 } 
+    movesLimit: 45, 
+    specialObstacles: { multipliers: 6 }, 
+    objective: { type: 'score', count: 4000 } 
   },
   { 
     id: 12, 
-    titleKey: 'Fase 12: Pureza Silenciosa', 
-    descKey: 'Alcance 4.500 pontos sem usar NENHUMA dica automática. Confie unicamente no seu olhar.', 
+    titlePT: 'Fase 12: Portais Unidos', 
+    titleEN: 'Stage 12: Twin Portals', 
+    titleES: 'Nivel 12: Portales Gemelos', 
+    descPT: 'As peças de portal se conectam à distância! Remova 25 pares quaisquer para vencer.', 
+    descEN: 'Portal tiles connect across distances! Remove any 25 pairs of tiles to complete.', 
+    descES: '¡Las piezas de portal se conectan a distancia! Elimina 25 parejas cualesquiera para ganar.', 
+    cols: 8, 
+    rows: 8, 
     targetScore: 4500, 
-    specialCondition: { type: 'no_hints', count: 1 } 
+    movesLimit: 45, 
+    specialObstacles: { portals: 3 }, 
+    objective: { type: 'pairs', count: 25 } 
   },
   { 
     id: 13, 
-    titleKey: 'Fase 13: Mestre do Combo', 
-    descKey: 'Mantenha a sequência ativa! Consiga um multiplicador de combo de 6x e faça 5.000 pontos.', 
+    titlePT: 'Fase 13: Labirinto Deserto', 
+    titleEN: 'Stage 13: Desert Maze', 
+    titleES: 'Nivel 13: Laberinto Desierto', 
+    descPT: '25% de espaços vazios e 6 cadeados pesados! Planeje as chaves para destravar as rotas.', 
+    descEN: '25% empty gaps and 6 heavy padlocks! Plan your keys carefully to unlock clean routes.', 
+    descES: '¡25% de huecos vacíos y 6 candados pesados! Planifica tus llaves para desbloquear rutas limpias.', 
+    cols: 8, 
+    rows: 9, 
     targetScore: 5000, 
-    specialCondition: { type: 'combo_streak', count: 6 } 
+    movesLimit: 45, 
+    emptyCellsPercentage: 0.25, 
+    specialObstacles: { locked: 6 }, 
+    mysteryCellsCount: 2, 
+    objective: { type: 'locks', count: 6 } 
   },
   { 
     id: 14, 
-    titleKey: 'Fase 14: Varredura Geral', 
-    descKey: 'Remova pelo menos 50 números do tabuleiro em 100 segundos para vencer o desafio.', 
-    targetScore: 6000, 
-    timeLimit: 100,
-    specialCondition: { type: 'cleared_numbers', count: 50 } 
+    titlePT: 'Fase 14: Combo Mestre', 
+    titleEN: 'Stage 14: Combo Master', 
+    titleES: 'Nivel 14: Maestro del Combo', 
+    descPT: 'Mantenha o ritmo acelerado! Consiga um multiplicador de combo de 5x antes do tempo acabar.', 
+    descEN: 'Keep up the fast pace! Achieve a 5x combo multiplier streak before time runs out.', 
+    descES: '¡Mantén el ritmo acelerado! Consigue un multiplicador de combo de 5x antes de que se acabe el tiempo.', 
+    cols: 8, 
+    rows: 9, 
+    targetScore: 5500, 
+    timeLimit: 120, 
+    objective: { type: 'combos', count: 5 } 
   },
   { 
     id: 15, 
-    titleKey: 'Fase 15: O Ápice do Zen', 
-    descKey: 'Grande teste de meio de jornada: Marque 7.500 pontos em 120s mantendo combo de pelo menos 8x.', 
-    targetScore: 7500, 
-    timeLimit: 120, 
-    specialCondition: { type: 'supreme_zen', count: 8 } 
+    titlePT: 'Fase 15: Varredura Completa', 
+    titleEN: 'Stage 15: Clean Sweep', 
+    titleES: 'Nivel 15: Barrido Completo', 
+    descPT: 'Grande teste de meio de jornada! Limpe absolutamente todas as peças do tabuleiro de jogo.', 
+    descEN: 'Mid-journey check! Completely wipe every single active number block off the board.', 
+    descES: '¡Gran prueba de mitad de camino! Limpia absolutamente todas las piezas de este tablero.', 
+    cols: 9, 
+    rows: 9, 
+    targetScore: 7000, 
+    movesLimit: 50, 
+    emptyCellsPercentage: 0.10, 
+    specialObstacles: { frozen: 8, locked: 4 }, 
+    mysteryCellsCount: 5, 
+    objective: { type: 'clear_board', count: 1 } 
   },
   { 
     id: 16, 
-    titleKey: 'Fase 16: Fusíveis Rápidos', 
-    descKey: 'A velocidade aumentou! Detone 10 bombas ativas em no máximo 40 movimentos calculados.', 
-    targetScore: 6000, 
-    movesLimit: 40,
-    specialCondition: { type: 'bombs', count: 10 } 
+    titlePT: 'Fase 16: Desafio dos Noves', 
+    titleEN: 'Stage 16: Nines Challenge', 
+    titleES: 'Nivel 16: Desafío de Nueves', 
+    descPT: 'Elimine 10 pares formados exclusivamente pelo dígito 9. Use as casas misteriosas para ajudar!', 
+    descEN: 'Eliminate 10 pairs made exclusively of the digit 9. Tap the mystery cells for help!', 
+    descES: 'Elimina 10 parejas del dígito 9. ¡Usa las celdas misteriosas para ayudarte a encontrarlos!', 
+    cols: 9, 
+    rows: 9, 
+    targetScore: 6500, 
+    movesLimit: 50, 
+    mysteryCellsCount: 8, 
+    objective: { type: 'same_number', count: 10, targetValue: 9 } 
   },
   { 
     id: 17, 
-    titleKey: 'Fase 17: Criptografia Total', 
-    descKey: 'Destranque 15 cadeados complexos para descriptografar a grade e pontuar 7.000.', 
-    targetScore: 7000, 
-    specialCondition: { type: 'locks', count: 15 } 
+    titlePT: 'Fase 17: Arsenal Explosivo', 
+    titleEN: 'Stage 17: Explosive Arsenal', 
+    titleES: 'Nivel 17: Arsenal Explosivo', 
+    descPT: 'Oito bombas voláteis ativas! Desarme todas combinando-as rapidamente para pontuar.', 
+    descEN: 'Eight volatile active bombs! Defuse all of them by making matches quickly to earn score.', 
+    descES: '¡Ocho bombas activas! Desármalas a todas emparejándolas rápidamente para ganar puntos.', 
+    cols: 9, 
+    rows: 9, 
+    targetScore: 7500, 
+    movesLimit: 50, 
+    specialObstacles: { bombs: 8 }, 
+    objective: { type: 'bombs', count: 8 } 
   },
   { 
     id: 18, 
-    titleKey: 'Fase 18: Choque Térmico', 
-    descKey: 'Uma perigosa mistura física: derreta 10 blocos de gelo e desarme 6 bombas relógio!', 
-    targetScore: 8000, 
-    specialCondition: { type: 'ice', count: 10 } 
+    titlePT: 'Fase 18: Inverno Cósmico', 
+    titleEN: 'Stage 18: Cosmic Freeze', 
+    titleES: 'Nivel 18: Invierno Cósmico', 
+    descPT: 'A geada bloqueou 12 posições! Derreta todo o gelo sob a tensão implacável do cronômetro.', 
+    descEN: 'Frost blocks 12 positions! Melt all the ice under the relentless pressure of the timer.', 
+    descES: '¡La helada bloqueó 12 posiciones! Derrite todo el hielo bajo la presión del temporizador.', 
+    cols: 9, 
+    rows: 10, 
+    targetScore: 8500, 
+    timeLimit: 150, 
+    specialObstacles: { frozen: 12 }, 
+    objective: { type: 'ice', count: 12 } 
   },
   { 
     id: 19, 
-    titleKey: 'Fase 19: Ampulheta de Aço', 
-    descKey: 'Abra 8 cadeados reforçados sob a tensão implacável de um cronômetro de 90 segundos.', 
+    titlePT: 'Fase 19: Ponte Dimensional', 
+    titleEN: 'Stage 19: Wormhole Bridge', 
+    titleES: 'Nivel 19: Puente Gusano', 
+    descPT: 'Portais distorcem o espaço com 20% de lacunas vazias. Faça 40 pares de combinações.', 
+    descEN: 'Portals bend space on a board with 20% empty gaps. Achieve 40 pairs of matches.', 
+    descES: 'Los portales doblan el espacio en un tablero con 20% de huecos. Consigue 40 parejas.', 
+    cols: 9, 
+    rows: 10, 
     targetScore: 9000, 
-    timeLimit: 90,
-    specialCondition: { type: 'locks', count: 8 } 
+    movesLimit: 55, 
+    emptyCellsPercentage: 0.20, 
+    specialObstacles: { portals: 4 }, 
+    mysteryCellsCount: 4, 
+    objective: { type: 'pairs', count: 40 } 
   },
   { 
     id: 20, 
-    titleKey: 'Fase 20: Fluxo Dimensional', 
-    descKey: 'Cruze o portal de fusão! Faça 12.000 pontos em no máximo 45 jogadas meticulosas.', 
-    targetScore: 12000, 
-    movesLimit: 45,
-    specialCondition: { type: 'combo_streak', count: 7 } 
+    titlePT: 'Fase 20: Templo Oculto', 
+    titleEN: 'Stage 20: Hidden Temple', 
+    titleES: 'Nivel 20: Templo Oculto', 
+    descPT: 'Quinze casas misteriosas dominam o santuário! Remova 15 pares que somam 10 debaixo da névoa.', 
+    descEN: 'Fifteen mystery cells dominate the shrine! Remove 15 pairs summing to 10 beneath the mist.', 
+    descES: '¡Quince celdas ocultas dominan el santuario! Elimina 15 parejas que sumen 10 bajo la niebla.', 
+    cols: 9, 
+    rows: 10, 
+    targetScore: 10000, 
+    movesLimit: 60, 
+    mysteryCellsCount: 15, 
+    objective: { type: 'sum_ten', count: 15 } 
   },
   { 
     id: 21, 
-    titleKey: 'Fase 21: Portal Multiplicador', 
-    descKey: 'Dobre seus ganhos usando células especiais! Alcance a épica marca de 15.000 pontos.', 
-    targetScore: 15000,
-    specialCondition: { type: 'supreme_zen', count: 9 }
+    titlePT: 'Fase 21: Economia Extrema', 
+    titleEN: 'Stage 21: Extreme Economy', 
+    titleES: 'Nivel 21: Economía Extrema', 
+    descPT: 'Pense muito antes de cada toque! Atinja 11.000 pontos com apenas 30 jogadas limitadas.', 
+    descEN: 'Think deeply before every tap! Hit 11,000 points with only 30 strictly limited moves.', 
+    descES: '¡Piensa muy bien antes de cada toque! Alcanza 11,000 puntos con solo 30 jugadas limitadas.', 
+    cols: 10, 
+    rows: 10, 
+    targetScore: 11000, 
+    movesLimit: 30, 
+    specialObstacles: { multipliers: 8 }, 
+    objective: { type: 'score', count: 11000 } 
   },
   { 
     id: 22, 
-    titleKey: 'Fase 22: Limpeza Extrema', 
-    descKey: 'Limpeza em massa! Remova 80 números do tabuleiro em um limite tenso de 110 segundos.', 
-    targetScore: 11000, 
-    timeLimit: 110,
-    specialCondition: { type: 'cleared_numbers', count: 80 } 
+    titlePT: 'Fase 22: Grande Faxina', 
+    titleEN: 'Stage 22: Big Clean Up', 
+    titleES: 'Nivel 22: Gran Limpieza', 
+    descPT: 'Um tabuleiro gigante que começa 30% vazio. Você precisará limpar todas as células ativas.', 
+    descEN: 'A massive grid starting 30% empty. You must sweep all remaining active numbers to win.', 
+    descES: 'Un tablero gigante que comienza 30% vacío. Debes limpiar todas las celdas activas para ganar.', 
+    cols: 10, 
+    rows: 10, 
+    targetScore: 12000, 
+    movesLimit: 60, 
+    emptyCellsPercentage: 0.30, 
+    objective: { type: 'clear_board', count: 1 } 
   },
   { 
     id: 23, 
-    titleKey: 'Fase 23: Cadeia de Isolamento', 
-    descKey: 'Infiltre-se no sistema! Destranque 18 cadeados em 50 jogadas de altíssima precisão.', 
+    titlePT: 'Fase 23: Fusão Caótica', 
+    titleEN: 'Stage 23: Chaotic Fusion', 
+    titleES: 'Nivel 23: Fusión Caótica', 
+    descPT: 'Uma mistura de 10 blocos de gelo e 8 cadeados reforçados. Abra os cadeados primeiro!', 
+    descEN: 'A tough mix of 10 ice blocks and 8 reinforced padlocks. Break those locks open first!', 
+    descES: 'Una mezcla de 10 bloques de hielo y 8 candados reforzados. ¡Abre los candados primero!', 
+    cols: 10, 
+    rows: 10, 
     targetScore: 13000, 
-    movesLimit: 50,
-    specialCondition: { type: 'locks', count: 18 } 
+    movesLimit: 60, 
+    specialObstacles: { frozen: 10, locked: 8 }, 
+    mysteryCellsCount: 6, 
+    objective: { type: 'locks', count: 8 } 
   },
   { 
     id: 24, 
-    titleKey: 'Fase 24: Era Glacial', 
-    descKey: 'O tabuleiro inteiro está prestes a congelar! Derreta 20 blocos de gelo em 120 segundos.', 
+    titlePT: 'Fase 24: Crise Nuclear', 
+    titleEN: 'Stage 24: Nuclear Crisis', 
+    titleES: 'Nivel 24: Crisis Nuclear', 
+    descPT: 'Oito ogivas de tempo prestes a explodir! Encontre os pares antes de ficar sem tempo.', 
+    descEN: 'Eight time warheads about to detonate! Find the matching pairs before time expires.', 
+    descES: '¡Ocho ojivas de tiempo a punto de estallar! Encuentra las parejas antes de que se acabe el tiempo.', 
+    cols: 10, 
+    rows: 11, 
     targetScore: 14000, 
-    timeLimit: 120,
-    specialCondition: { type: 'ice', count: 20 } 
+    timeLimit: 180, 
+    specialObstacles: { bombs: 8 }, 
+    objective: { type: 'bombs', count: 8 } 
   },
   { 
     id: 25, 
-    titleKey: 'Fase 25: Arsenal Explosivo', 
-    descKey: 'Desarme 12 bombas que ameaçam explodir sua barra de progresso em até 45 jogadas.', 
-    targetScore: 16000, 
-    movesLimit: 45,
-    specialCondition: { type: 'bombs', count: 12 } 
+    titlePT: 'Fase 25: Perfeição Zen', 
+    titleEN: 'Stage 25: Zen Perfection', 
+    titleES: 'Nivel 25: Perfección Zen', 
+    descPT: 'Entre no fluxo absoluto. Obtenha um multiplicador de combo de 8x para concluir este desafio.', 
+    descEN: 'Enter the absolute flow state. Reach an epic 8x combo multiplier to clear this challenge.', 
+    descES: 'Entra en el estado de flujo absoluto. Consigue un combo de 8x para superar este desafío.', 
+    cols: 10, 
+    rows: 11, 
+    targetScore: 15000, 
+    movesLimit: 65, 
+    mysteryCellsCount: 5, 
+    objective: { type: 'combos', count: 8 } 
   },
   { 
     id: 26, 
-    titleKey: 'Fase 26: Sequência Divina', 
-    descKey: 'Domine o algoritmo! Atinja um combo monumental de 10x e marque 18.000 pontos.', 
-    targetScore: 18000, 
-    timeLimit: 130,
-    specialCondition: { type: 'combo_streak', count: 10 } 
+    titlePT: 'Fase 26: Colecionador de Cincos', 
+    titleEN: 'Stage 26: Five Collector', 
+    titleES: 'Nivel 26: Colector de Cincos', 
+    descPT: 'Colete 15 pares do algarismo 5. Cuidado com as 12 casas de névoa cobrindo os números.', 
+    descEN: 'Collect 15 pairs of the digit 5. Beware of the 12 mist cells covering the numbers.', 
+    descES: 'Colecciona 15 parejas del dígito 5. Cuidado con las 12 celdas de niebla que cubren los números.', 
+    cols: 10, 
+    rows: 11, 
+    targetScore: 16000, 
+    movesLimit: 65, 
+    mysteryCellsCount: 12, 
+    objective: { type: 'same_number', count: 15, targetValue: 5 } 
   },
   { 
     id: 27, 
-    titleKey: 'Fase 27: Labirinto de Vidro', 
-    descKey: 'O teste definitivo de resiliência: destrua 15 gelos e rompa 20 cadeados bloqueados!', 
-    targetScore: 20000, 
-    specialCondition: { type: 'locks', count: 20 } 
+    titlePT: 'Fase 27: Caminho Estreito', 
+    titleEN: 'Stage 27: Narrow Path', 
+    titleES: 'Nivel 27: Camino Estrecho', 
+    descPT: '40% do tabuleiro inicial está vazio! Conecte as peças pelas poucas pontes ativas.', 
+    descEN: '40% of the initial grid is empty! Connect pieces through the few active bridges.', 
+    descES: '¡El 40% del tablero inicial está vacío! Conecta las piezas a través de los pocos puentes.', 
+    cols: 11, 
+    rows: 11, 
+    targetScore: 18000, 
+    movesLimit: 70, 
+    emptyCellsPercentage: 0.40, 
+    specialObstacles: { frozen: 8, locked: 6, portals: 2 }, 
+    mysteryCellsCount: 8, 
+    objective: { type: 'pairs', count: 50 } 
   },
   { 
     id: 28, 
-    titleKey: 'Fase 28: Inferno de Relógio', 
-    descKey: 'Detone 15 bombas de tempo extremamente rápidas em no máximo 150 segundos.', 
-    targetScore: 22000, 
-    timeLimit: 150,
-    specialCondition: { type: 'bombs', count: 15 } 
+    titlePT: 'Fase 28: Prisão Glacial', 
+    titleEN: 'Stage 28: Glacial Prison', 
+    titleES: 'Nivel 28: Prisión Glacial', 
+    descPT: 'Vinte blocos congelados prendem as combinações! Use sua visão espacial para derreter tudo.', 
+    descEN: 'Twenty frozen blocks lock the combinations! Use your spatial vision to melt them all.', 
+    descES: '¡Veinte bloques congelados bloquean el tablero! Usa tu visión espacial para derretirlo todo.', 
+    cols: 11, 
+    rows: 11, 
+    targetScore: 20000, 
+    movesLimit: 75, 
+    specialObstacles: { frozen: 20 }, 
+    objective: { type: 'ice', count: 20 } 
   },
   { 
     id: 29, 
-    titleKey: 'Fase 29: Abismo de Silêncio', 
-    descKey: 'Chegue a 25.000 pontos em 60 jogadas sem pedir dicas. Cada erro consome uma vida!', 
-    targetScore: 25000, 
-    movesLimit: 60,
-    specialCondition: { type: 'no_hints', count: 1 } 
+    titlePT: 'Fase 29: Névoa Absoluta', 
+    titleEN: 'Stage 29: Absolute Mist', 
+    titleES: 'Nivel 29: Niebla Absoluta', 
+    descPT: 'O tabuleiro está quase todo escuro com 25 casas misteriosas! Faça 30 somas dez.', 
+    descEN: 'The board is almost fully dark with 25 mystery cells! Complete 30 pairs summing to 10.', 
+    descES: '¡El tablero está casi oscuro con 25 celdas misteriosas! Consigue 30 parejas que sumen 10.', 
+    cols: 11, 
+    rows: 12, 
+    targetScore: 22000, 
+    movesLimit: 80, 
+    mysteryCellsCount: 25, 
+    objective: { type: 'sum_ten', count: 30 } 
   },
   { 
     id: 30, 
-    titleKey: 'Fase 30: Divindade Matemática', 
-    descKey: 'O cume do NumZen. Consiga impressionantes 35.000 pontos com combo de 12x em até 180 segundos!', 
-    targetScore: 35000, 
-    timeLimit: 180, 
-    specialCondition: { type: 'supreme_zen', count: 12 } 
+    titlePT: 'Fase 30: Portal da Divindade', 
+    titleEN: 'Stage 30: Gate of Divinity', 
+    titleES: 'Nivel 30: Portal de la Divinidad', 
+    descPT: 'O teste supremo de NumZen! Vença todos os obstáculos e limpe completamente o tabuleiro.', 
+    descEN: 'The ultimate test of NumZen! Conquer all obstacles and fully clear the entire board.', 
+    descES: '¡La prueba de fuego de NumZen! Conquista todos los obstáculos y limpia por completo el tablero.', 
+    cols: 12, 
+    rows: 12, 
+    targetScore: 30000, 
+    movesLimit: 90, 
+    emptyCellsPercentage: 0.15, 
+    specialObstacles: { frozen: 15, locked: 10, bombs: 5, portals: 4, multipliers: 8 }, 
+    mysteryCellsCount: 10, 
+    objective: { type: 'clear_board', count: 1 } 
   }
 ];
 
@@ -317,6 +537,41 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
       supreme_zen: config.language === 'pt' ? 'Desafio Supremo' : config.language === 'es' ? 'Desafío Supremo' : 'Supreme Challenge'
     };
     return labels[type] || type;
+  };
+
+  const getObjectiveLabel = (obj: { type: string; count: number; targetValue?: number }) => {
+    switch (obj.type) {
+      case 'score':
+        return config.language === 'pt' ? 'Atingir Pontuação' : config.language === 'es' ? 'Alcanzar Puntos' : 'Reach Score';
+      case 'pairs':
+        return config.language === 'pt' ? 'Remover Pares' : config.language === 'es' ? 'Eliminar Pares' : 'Remove Pairs';
+      case 'clear_board':
+        return config.language === 'pt' ? 'Limpar Tabuleiro' : config.language === 'es' ? 'Limpiar Tablero' : 'Clear Board';
+      case 'same_number':
+        return config.language === 'pt' ? `Remover Pares de ${obj.targetValue}` : config.language === 'es' ? `Eliminar Parejas de ${obj.targetValue}` : `Remove Pairs of ${obj.targetValue}`;
+      case 'sum_ten':
+        return config.language === 'pt' ? 'Pares que Somam 10' : config.language === 'es' ? 'Parejas que Suman 10' : 'Pairs Summing to 10';
+      case 'ice':
+        return config.language === 'pt' ? 'Derreter Gelo' : config.language === 'es' ? 'Derretir Hielo' : 'Melt Ice';
+      case 'locks':
+        return config.language === 'pt' ? 'Abrir Cadeados' : config.language === 'es' ? 'Abrir Candados' : 'Unlock Padlocks';
+      case 'bombs':
+        return config.language === 'pt' ? 'Desarmar Bombas' : config.language === 'es' ? 'Desarmar Bombas' : 'Defuse Bombs';
+      case 'combos':
+        return config.language === 'pt' ? 'Multiplicador de Combo' : config.language === 'es' ? 'Multiplicador de Combo' : 'Combo Multiplier';
+      default:
+        return obj.type;
+    }
+  };
+
+  const getObjectiveCountLabel = (obj: { type: string; count: number }) => {
+    if (obj.type === 'clear_board') {
+      return config.language === 'pt' ? 'Completo' : config.language === 'es' ? 'Completo' : 'Complete';
+    }
+    if (obj.type === 'combos') {
+      return `${obj.count}x`;
+    }
+    return `x${obj.count}`;
   };
 
   // Reordering the winding nodes so that Level 1 is at the bottom of the scroll view
@@ -490,7 +745,7 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
                   {config.language === 'pt' ? `FASE ${selectedLevel.id}` : config.language === 'es' ? `NIVEL ${selectedLevel.id}` : `STAGE ${selectedLevel.id}`}
                 </span>
                 <h3 className={`text-lg font-black tracking-tight ${themeStyles.textPrimary}`}>
-                  {selectedLevel.titleKey}
+                  {config.language === 'es' ? selectedLevel.titleES : config.language === 'en' ? selectedLevel.titleEN : selectedLevel.titlePT}
                 </h3>
               </div>
 
@@ -511,7 +766,7 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
 
             {/* Description Text */}
             <p className={`text-sm leading-relaxed ${themeStyles.textSecondary}`}>
-              {selectedLevel.descKey}
+              {config.language === 'es' ? selectedLevel.descES : config.language === 'en' ? selectedLevel.descEN : selectedLevel.descPT}
             </p>
 
             {/* Objective items with icon layout */}
@@ -528,27 +783,27 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
                     <Trophy className="w-4 h-4" />
                   </div>
                   <div className="flex flex-col">
-                    <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>Pontuação</span>
+                    <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>
+                      {config.language === 'pt' ? 'Pontuação' : config.language === 'es' ? 'Puntos' : 'Score'}
+                    </span>
                     <span className={`text-xs font-black font-mono ${themeStyles.textPrimary}`}>
                       {selectedLevel.targetScore.toLocaleString()} pts
                     </span>
                   </div>
                 </div>
 
-                {/* Meta 2: Condição Especial */}
-                {selectedLevel.specialCondition && (
+                {/* Meta 2: Objetivo Primário de Fase */}
+                {selectedLevel.objective && (
                   <div className={`p-3 rounded-2xl border flex items-center gap-2.5 ${themeStyles.itemBg}`}>
                     <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-500 animate-pulse">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col">
                       <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>
-                        {getSpecialLabel(selectedLevel.specialCondition.type)}
+                        {getObjectiveLabel(selectedLevel.objective)}
                       </span>
                       <span className={`text-xs font-black font-mono ${themeStyles.textPrimary}`}>
-                        {selectedLevel.specialCondition.type === 'no_hints' || selectedLevel.specialCondition.type === 'no_duplicates'
-                          ? 'Ativo'
-                          : `x${selectedLevel.specialCondition.count}`}
+                        {getObjectiveCountLabel(selectedLevel.objective)}
                       </span>
                     </div>
                   </div>
@@ -561,9 +816,11 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
                       <Activity className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col">
-                      <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>Limite</span>
+                      <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>
+                        {config.language === 'pt' ? 'Limite' : config.language === 'es' ? 'Límite' : 'Limit'}
+                      </span>
                       <span className={`text-xs font-black font-mono ${themeStyles.textPrimary}`}>
-                        {selectedLevel.movesLimit} Jogadas
+                        {selectedLevel.movesLimit} {config.language === 'pt' ? 'Jogadas' : config.language === 'es' ? 'Jugadas' : 'Moves'}
                       </span>
                     </div>
                   </div>
@@ -576,13 +833,32 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
                       <Clock className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col">
-                      <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>Cronômetro</span>
+                      <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>
+                        {config.language === 'pt' ? 'Cronômetro' : config.language === 'es' ? 'Cronómetro' : 'Timer'}
+                      </span>
                       <span className={`text-xs font-black font-mono ${themeStyles.textPrimary}`}>
                         {selectedLevel.timeLimit}s
                       </span>
                     </div>
                   </div>
                 )}
+
+                {/* Meta 5: Casas Misteriosas */}
+                {selectedLevel.mysteryCellsCount && selectedLevel.mysteryCellsCount > 0 ? (
+                  <div className={`p-3 rounded-2xl border flex items-center gap-2.5 ${themeStyles.itemBg}`}>
+                    <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-500">
+                      <Compass className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className={`text-[8px] uppercase tracking-wider font-bold ${themeStyles.textSecondary}`}>
+                        {config.language === 'pt' ? 'Misteriosos' : config.language === 'es' ? 'Misteriosos' : 'Mystery Cells'}
+                      </span>
+                      <span className={`text-xs font-black font-mono ${themeStyles.textPrimary}`}>
+                        x{selectedLevel.mysteryCellsCount}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -593,7 +869,7 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({
                 SynthAudio.playClick(config.soundEnabled);
                 onSelectLevel(selectedLevel.id);
               }}
-              className={`py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-3 cursor-pointer shadow-xl transition-all duration-300 hover:scale-[1.01] active:scale-95 ${themeStyles.primaryBtn}`}
+              className={`py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-3 cursor-pointer shadow-xl transition-all duration-300 hover:scale-[1.01] active:scale-95 ${themeStyles.primaryBtn} mt-4`}
             >
               <Play className="w-4 h-4 fill-current text-current animate-pulse-subtle" />
               <span>{config.language === 'pt' ? 'INICIAR DESAFIO' : config.language === 'es' ? 'INICIAR DESAFÍO' : 'LAUNCH CHALLENGE'}</span>

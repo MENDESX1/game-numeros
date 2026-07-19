@@ -1,5 +1,5 @@
 import React from 'react';
-import { GameConfig } from '../types';
+import { GameConfig, ChallengeLevel } from '../types';
 import { TRANSLATIONS } from '../config/gameConfig';
 import { 
   Trophy, 
@@ -15,19 +15,6 @@ import {
   Sparkles,
   Award
 } from 'lucide-react';
-
-interface ChallengeLevel {
-  id: number;
-  titleKey: string;
-  descKey: string;
-  targetScore: number;
-  movesLimit?: number;
-  timeLimit?: number;
-  specialCondition?: {
-    type: 'ice' | 'locks' | 'bombs' | 'score' | 'no_hints' | 'no_duplicates' | 'combo_streak' | 'cleared_numbers' | 'supreme_zen';
-    count: number;
-  };
-}
 
 interface InfoPanelProps {
   mode: 'classic' | 'relax' | 'timed' | 'challenge' | 'survival' | 'frozen' | 'bombs' | 'locks' | 'infinite';

@@ -105,6 +105,8 @@ export default function App() {
   const [linesAddedCount, setLinesAddedCount] = useState<number>(0);
   const [maxComboInLevel, setMaxComboInLevel] = useState<number>(1);
   const [clearedNumbersCount, setClearedNumbersCount] = useState<number>(0);
+  const [levelPairsMatched, setLevelPairsMatched] = useState<number>(0);
+  const [levelSumTenMatched, setLevelSumTenMatched] = useState<number>(0);
 
   // Mistakes/Lives, Shuffles, Locks, and Errors
   const [lives, setLives] = useState<number>(5);
@@ -409,6 +411,8 @@ export default function App() {
     setLinesAddedCount(0);
     setMaxComboInLevel(1);
     setClearedNumbersCount(0);
+    setLevelPairsMatched(0);
+    setLevelSumTenMatched(0);
     setIsPaused(false);
     setShowRestartConfirm(false);
     setShowExitConfirm(false);
@@ -459,7 +463,8 @@ export default function App() {
     const levelSizeParam = challengeId 
       ? Math.floor(4 + challengeId * 0.3) // Level 1 is 4, Level 10 is 7, Level 20 is 10, Level 30 is 13 (massive grid!)
       : profile.level;
-    const { cells: initialCells, cols: initialCols } = GameEngine.generateInitialBoard(boardMode, selectedDiff, levelSizeParam);
+    const customLevelConfig = challengeId ? CHALLENGE_LEVELS.find(l => l.id === challengeId) : undefined;
+    const { cells: initialCells, cols: initialCols } = GameEngine.generateInitialBoard(boardMode, selectedDiff, levelSizeParam, customLevelConfig);
     setCells(initialCells);
     setCols(initialCols);
 
@@ -487,10 +492,13 @@ export default function App() {
 
   // Maps custom level constraints to physical base generator layouts
   const getChallengeBaseMode = (lvlId: number): GameMode => {
-    if ([1, 6, 11, 18, 24, 27].includes(lvlId)) return 'frozen';
-    if ([4, 9, 17, 19, 23, 27].includes(lvlId)) return 'locks';
-    if ([3, 8, 16, 18, 25, 28].includes(lvlId)) return 'bombs';
-    if (lvlId === 21) return 'multipliers';
+    const lvl = CHALLENGE_LEVELS.find(l => l.id === lvlId);
+    if (lvl?.specialObstacles) {
+      if (lvl.specialObstacles.frozen && lvl.specialObstacles.frozen > 0) return 'frozen';
+      if (lvl.specialObstacles.locked && lvl.specialObstacles.locked > 0) return 'locks';
+      if (lvl.specialObstacles.bombs && lvl.specialObstacles.bombs > 0) return 'bombs';
+      if (lvl.specialObstacles.multipliers && lvl.specialObstacles.multipliers > 0) return 'multipliers';
+    }
     return 'classic';
   };
 
@@ -537,7 +545,19 @@ export default function App() {
     GameStorage.saveStats(nextStats);
   };
 
-  const checkVictoryConditions = (scoreVal: number, cellsLeft: Cell[], finalStep = false) => {
+  const checkVictoryConditions = (
+    scoreVal: number, 
+    cellsLeft: Cell[], 
+    finalStep = false, 
+    context?: { 
+      pairsMatched?: number; 
+      sumTenMatched?: number;
+      clearedIce?: number; 
+      clearedLocks?: number; 
+      clearedBombs?: number; 
+      maxCombo?: number;
+    }
+  ) => {
     const activeLeft = GameEngine.getActiveIndices(cellsLeft).length;
 
     // Challenge Level criteria
@@ -545,24 +565,46 @@ export default function App() {
       const lvl = CHALLENGE_LEVELS.find(l => l.id === levelId);
       if (!lvl) return;
 
-      let scoreTargetMet = scoreVal >= lvl.targetScore;
-      let specialTargetMet = true;
+      const scoreTargetMet = scoreVal >= lvl.targetScore;
+      let objectiveTargetMet = false;
 
-      if (lvl.specialCondition) {
-        const condType = lvl.specialCondition.type;
-        const targetVal = lvl.specialCondition.count;
+      const obj = lvl.objective;
+      if (obj) {
+        const currentPairs = context?.pairsMatched !== undefined ? context.pairsMatched : levelPairsMatched;
+        const currentSumTen = context?.sumTenMatched !== undefined ? context.sumTenMatched : levelSumTenMatched;
+        const currentIce = context?.clearedIce !== undefined ? context.clearedIce : clearedIce;
+        const currentLocks = context?.clearedLocks !== undefined ? context.clearedLocks : clearedLocks;
+        const currentBombs = context?.clearedBombs !== undefined ? context.clearedBombs : clearedBombs;
+        const currentMaxCombo = context?.maxCombo !== undefined ? context.maxCombo : maxComboInLevel;
 
-        if (condType === 'ice') specialTargetMet = clearedIce >= targetVal;
-        if (condType === 'locks') specialTargetMet = clearedLocks >= targetVal;
-        if (condType === 'bombs') specialTargetMet = clearedBombs >= targetVal;
-        if (condType === 'no_hints') specialTargetMet = hintsUsed === 0;
-        if (condType === 'no_duplicates') specialTargetMet = linesAddedCount === 0;
-        if (condType === 'combo_streak') specialTargetMet = maxComboInLevel >= targetVal;
-        if (condType === 'cleared_numbers') specialTargetMet = clearedNumbersCount >= targetVal;
-        if (condType === 'supreme_zen') specialTargetMet = hintsUsed === 0 && maxComboInLevel >= targetVal;
+        if (obj.type === 'score') {
+          objectiveTargetMet = scoreVal >= obj.count;
+        } else if (obj.type === 'pairs') {
+          objectiveTargetMet = currentPairs >= obj.count;
+        } else if (obj.type === 'clear_board') {
+          objectiveTargetMet = activeLeft === 0;
+        } else if (obj.type === 'same_number') {
+          const targetValue = obj.targetValue || 7;
+          const leftOfType = cellsLeft.filter(c => !c.removed && c.value === targetValue).length;
+          const startingOfType = cells.filter(c => c.value === targetValue).length;
+          const clearedPairs = Math.floor((startingOfType - leftOfType) / 2);
+          objectiveTargetMet = clearedPairs >= obj.count;
+        } else if (obj.type === 'sum_ten') {
+          objectiveTargetMet = currentSumTen >= obj.count;
+        } else if (obj.type === 'ice') {
+          objectiveTargetMet = currentIce >= obj.count;
+        } else if (obj.type === 'locks') {
+          objectiveTargetMet = currentLocks >= obj.count;
+        } else if (obj.type === 'bombs') {
+          objectiveTargetMet = currentBombs >= obj.count;
+        } else if (obj.type === 'combos') {
+          objectiveTargetMet = currentMaxCombo >= obj.count;
+        }
+      } else {
+        objectiveTargetMet = true;
       }
 
-      if (scoreTargetMet && specialTargetMet) {
+      if (objectiveTargetMet && scoreTargetMet) {
         handleVictory(scoreVal);
       } else if (finalStep && GameEngine.checkVictory(cellsLeft)) {
         // Clear board but targets missed
@@ -751,6 +793,37 @@ export default function App() {
     const clickedCell = cells[idx];
     if (clickedCell.removed || clickedCell.value === 0 || clickedCell.locked) return;
 
+    // Handle mystery cell click reveal
+    if (clickedCell.mystery && !clickedCell.revealed) {
+      const updatedCells = [...cells];
+      // Reveal the clicked mystery cell
+      updatedCells[idx] = { ...updatedCells[idx], revealed: true };
+      
+      // Also reveal its immediate horizontal and vertical neighbors
+      const r = Math.floor(idx / cols);
+      const c = idx % cols;
+      const neighbors = [
+        { r: r - 1, c },
+        { r: r + 1, c },
+        { r: r, c: c - 1 },
+        { r: r, c: c + 1 }
+      ];
+      
+      const totalRows = Math.ceil(cells.length / cols);
+      neighbors.forEach(n => {
+        if (n.r >= 0 && n.r < totalRows && n.c >= 0 && n.c < cols) {
+          const nIdx = n.r * cols + n.c;
+          if (nIdx >= 0 && nIdx < cells.length && cells[nIdx] && !cells[nIdx].removed) {
+            updatedCells[nIdx] = { ...updatedCells[nIdx], revealed: true };
+          }
+        }
+      });
+      
+      setCells(updatedCells);
+      SynthAudio.playUnlock(config.soundEnabled);
+      return;
+    }
+
     if (selectedIndex === null) {
       // First selection
       setSelectedIndex(idx);
@@ -882,6 +955,21 @@ export default function App() {
           return nextCombo;
         });
 
+        // Calculate next local values for immediate context evaluation (avoiding async React state delays!)
+        const nextPairsMatched = levelPairsMatched + 1;
+        setLevelPairsMatched(nextPairsMatched);
+
+        let nextSumTenMatched = levelSumTenMatched;
+        if (cellA.value + cellB.value === 10) {
+          nextSumTenMatched += 1;
+          setLevelSumTenMatched(nextSumTenMatched);
+        }
+
+        const nextIce = result.isIceBroken ? clearedIce + 1 : clearedIce;
+        const nextLocks = result.isLockOpened ? clearedLocks + 1 : clearedLocks;
+        const nextBombs = result.isBombTriggered ? clearedBombs + 1 : clearedBombs;
+        const nextMaxCombo = Math.max(maxComboInLevel, combo + 1);
+
         // Reset Combo Timer (Multipliers Mode holds combo for 6 seconds, others 4 seconds)
         const comboHoldTime = mode === 'multipliers' ? 6000 : 4000;
         if (comboTimeoutRef.current) clearTimeout(comboTimeoutRef.current);
@@ -907,6 +995,14 @@ export default function App() {
 
         // Delay updating cells state until the glide visual approximation transition (280ms) finishes!
         setTimeout(() => {
+          const contextVal = {
+            pairsMatched: nextPairsMatched,
+            sumTenMatched: nextSumTenMatched,
+            clearedIce: nextIce,
+            clearedLocks: nextLocks,
+            clearedBombs: nextBombs,
+            maxCombo: nextMaxCombo
+          };
           let finalUpdatedCells = [...result.updatedCells];
           let bombsDetonatedCount = 0;
           const explodedByBombs: number[] = [];
@@ -992,7 +1088,7 @@ export default function App() {
           GameStorage.updateAchievementProgress('combo', combo);
 
           // Check victory
-          checkVictoryConditions(nextScore, cleanedCells);
+          checkVictoryConditions(nextScore, cleanedCells, false, contextVal);
 
           // Check for locked state (no more moves)
           checkBoardLock(cleanedCells, cols);

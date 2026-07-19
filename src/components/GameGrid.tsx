@@ -126,24 +126,14 @@ export const GameGrid: React.FC<GameGridProps> = React.memo(({
         {cells.map((cell, idx) => {
           const isSelected = selectedIndex === idx;
 
-          // Fog of War (challenge / Dark Mode / Escuro) visibility logic
+          // Mystery Cell visibility logic
           const isRevealed = (() => {
-            if (mode !== 'challenge') return true;
-            // Top 2 rows are always visible as a guiding reference anchor
-            if (idx < cols * 2) return true;
-            // Currently selected cell reveals a 2x2 grid radius around itself
-            if (selectedIndex !== null) {
-              const rSel = Math.floor(selectedIndex / cols);
-              const cSel = selectedIndex % cols;
-              const rCell = Math.floor(idx / cols);
-              const cCell = idx % cols;
-              if (Math.abs(rSel - rCell) <= 2 && Math.abs(cSel - cCell) <= 2) {
-                return true;
-              }
+            if (cell.mystery) {
+              if (cell.revealed) return true;
+              if (highlightedIndices.includes(idx)) return true;
+              return false;
             }
-            // Highlighted indices (e.g. from Hint) are always visible
-            if (highlightedIndices.includes(idx)) return true;
-            return false;
+            return true;
           })();
 
           if (cell.removed) {

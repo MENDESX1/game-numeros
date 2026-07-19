@@ -25,6 +25,37 @@ export interface Cell {
   chainIndex?: number; // For 'chained': order to clear
   bombTimer?: number; // Countdown for active bombs in bombs mode
   removed: boolean; // Flag if cell was cleared
+  mystery?: boolean; // is this cell a mystery hidden cell?
+  revealed?: boolean; // has this mystery cell been revealed?
+}
+
+export interface ChallengeLevel {
+  id: number;
+  titlePT: string;
+  titleEN: string;
+  titleES: string;
+  descPT: string;
+  descEN: string;
+  descES: string;
+  cols: number;
+  rows: number;
+  targetScore: number;
+  movesLimit?: number;
+  timeLimit?: number;
+  mysteryCellsCount?: number;
+  emptyCellsPercentage?: number; // percentage of cells to remove at start (for empty spaces)
+  specialObstacles?: {
+    frozen?: number;
+    locked?: number;
+    bombs?: number;
+    multipliers?: number;
+    portals?: number;
+  };
+  objective: {
+    type: 'score' | 'pairs' | 'clear_board' | 'same_number' | 'sum_ten' | 'ice' | 'locks' | 'bombs' | 'combos';
+    count: number;
+    targetValue?: number; // For 'same_number', which number to clear (e.g. 7)
+  };
 }
 
 export interface BoardState {
