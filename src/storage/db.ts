@@ -231,7 +231,7 @@ export const GameStorage = {
     const m = missions[index];
     if (m.completed) return null;
 
-    if (missionId === 'daily_score' || missionId === 'weekly_combos') {
+    if (missionId === 'daily_score' || missionId === 'weekly_combos' || missionId === 'daily_combo_streak') {
       m.currentValue = Math.min(m.targetValue, Math.max(m.currentValue, increment));
     } else {
       m.currentValue = Math.min(m.targetValue, m.currentValue + increment);

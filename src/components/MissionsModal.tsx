@@ -32,6 +32,10 @@ export const MissionsModal: React.FC<MissionsModalProps> = ({
       else if (descKey.includes('Achieve a combo of {n}x')) text = `Consiga um combo de ${targetVal}x`;
       else if (descKey.includes('Trigger {n} bombs')) text = `Estoure ${targetVal} bombas`;
       else if (descKey.includes('Earn {n} coins')) text = `Ganhe ${targetVal} moedas jogando`;
+      else if (descKey.includes('Win {n} classic games')) text = `Vença ${targetVal} partidas no modo clássico`;
+      else if (descKey.includes('Win {n} relax games')) text = `Vença ${targetVal} partidas no modo relax`;
+      else if (descKey.includes('Melt {n} ice blocks')) text = `Derreta ${targetVal} blocos de gelo`;
+      else if (descKey.includes('Unlock {n} locks')) text = `Abra ${targetVal} cadeados`;
     } else if (config.language === 'es') {
       if (descKey.includes('Reach {n} score')) text = `Alcanza ${targetVal} puntos en cualquier partida`;
       else if (descKey.includes('Clear {n} pieces')) text = `Elimina ${targetVal} fichas en total`;
@@ -39,6 +43,10 @@ export const MissionsModal: React.FC<MissionsModalProps> = ({
       else if (descKey.includes('Achieve a combo of {n}x')) text = `Consigue un combo de ${targetVal}x`;
       else if (descKey.includes('Trigger {n} bombs')) text = `Explota ${targetVal} bombas`;
       else if (descKey.includes('Earn {n} coins')) text = `Gana ${targetVal} monedas jugando`;
+      else if (descKey.includes('Win {n} classic games')) text = `Gana ${targetVal} partidas en modo clásico`;
+      else if (descKey.includes('Win {n} relax games')) text = `Gana ${targetVal} partidas en modo relax`;
+      else if (descKey.includes('Melt {n} ice blocks')) text = `Derrite ${targetVal} bloques de hielo`;
+      else if (descKey.includes('Unlock {n} locks')) text = `Abre ${targetVal} candados`;
     } else {
       // English
       text = descKey.replace('{n}', targetVal.toString());

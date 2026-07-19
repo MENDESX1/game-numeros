@@ -595,44 +595,112 @@ export const DEFAULT_ACHIEVEMENTS: Achievement[] = [
 
 export function getMissions(dateStr: string): GameMission[] {
   // Use date string to seed values so it changes daily/weekly automatically
-  const hash = dateStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  let seed = dateStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
-  return [
+  const lcg = () => {
+    // Standard LCG parameters
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+
+  const dailyTemplates = [
     {
       id: 'daily_score',
-      type: 'daily',
       descriptionKey: 'Reach {n} score in any game',
-      targetValue: 1500 + (hash % 10) * 100,
-      currentValue: 0,
-      completed: false,
+      targetValue: 1000 + Math.floor(lcg() * 10) * 200, // 1000 to 2800
       rewardCoins: 40,
       rewardXP: 100
     },
     {
       id: 'daily_clears',
-      type: 'daily',
       descriptionKey: 'Clear {n} pieces',
-      targetValue: 120 + (hash % 8) * 10,
-      currentValue: 0,
-      completed: false,
+      targetValue: 40 + Math.floor(lcg() * 8) * 10, // 40 to 110
       rewardCoins: 50,
       rewardXP: 120
     },
     {
       id: 'daily_games',
-      type: 'daily',
       descriptionKey: 'Complete {n} matches',
-      targetValue: 2 + (hash % 3),
-      currentValue: 0,
-      completed: false,
+      targetValue: 2 + Math.floor(lcg() * 3), // 2 to 4
       rewardCoins: 30,
       rewardXP: 80
     },
     {
+      id: 'daily_win_classic',
+      descriptionKey: 'Win {n} classic games',
+      targetValue: 1 + Math.floor(lcg() * 2), // 1 to 2
+      rewardCoins: 45,
+      rewardXP: 110
+    },
+    {
+      id: 'daily_win_relax',
+      descriptionKey: 'Win {n} relax games',
+      targetValue: 1 + Math.floor(lcg() * 2), // 1 to 2
+      rewardCoins: 35,
+      rewardXP: 90
+    },
+    {
+      id: 'daily_trigger_bombs',
+      descriptionKey: 'Trigger {n} bombs',
+      targetValue: 1 + Math.floor(lcg() * 3), // 1 to 3
+      rewardCoins: 40,
+      rewardXP: 100
+    },
+    {
+      id: 'daily_combo_streak',
+      descriptionKey: 'Achieve a combo of {n}x',
+      targetValue: 4 + Math.floor(lcg() * 4), // 4 to 7
+      rewardCoins: 50,
+      rewardXP: 125
+    },
+    {
+      id: 'daily_melt_ice',
+      descriptionKey: 'Melt {n} ice blocks',
+      targetValue: 4 + Math.floor(lcg() * 5) * 2, // 4 to 12
+      rewardCoins: 45,
+      rewardXP: 110
+    },
+    {
+      id: 'daily_unlock_locks',
+      descriptionKey: 'Unlock {n} locks',
+      targetValue: 4 + Math.floor(lcg() * 5) * 2, // 4 to 12
+      rewardCoins: 45,
+      rewardXP: 110
+    },
+    {
+      id: 'daily_earn_coins',
+      descriptionKey: 'Earn {n} coins from playing',
+      targetValue: 50 + Math.floor(lcg() * 10) * 10, // 50 to 140
+      rewardCoins: 40,
+      rewardXP: 100
+    }
+  ];
+
+  // Select 3 random unique daily templates using the LCG
+  const selectedDailies: GameMission[] = [];
+  const templatesCopy = [...dailyTemplates];
+  while (selectedDailies.length < 3 && templatesCopy.length > 0) {
+    const idx = Math.floor(lcg() * templatesCopy.length);
+    const selected = templatesCopy.splice(idx, 1)[0];
+    selectedDailies.push({
+      id: selected.id,
+      type: 'daily',
+      descriptionKey: selected.descriptionKey,
+      targetValue: selected.targetValue,
+      currentValue: 0,
+      completed: false,
+      rewardCoins: selected.rewardCoins,
+      rewardXP: selected.rewardXP
+    });
+  }
+
+  // Also include the weekly ones so there's always weekly challenges
+  const weeklyTemplates: GameMission[] = [
+    {
       id: 'weekly_combos',
       type: 'weekly',
       descriptionKey: 'Achieve a combo of {n}x',
-      targetValue: 10 + (hash % 6),
+      targetValue: 10 + Math.floor(lcg() * 6),
       currentValue: 0,
       completed: false,
       rewardCoins: 150,
@@ -642,7 +710,7 @@ export function getMissions(dateStr: string): GameMission[] {
       id: 'weekly_bombs',
       type: 'weekly',
       descriptionKey: 'Trigger {n} bombs',
-      targetValue: 15 + (hash % 10),
+      targetValue: 15 + Math.floor(lcg() * 10),
       currentValue: 0,
       completed: false,
       rewardCoins: 180,
@@ -652,11 +720,13 @@ export function getMissions(dateStr: string): GameMission[] {
       id: 'weekly_coins',
       type: 'weekly',
       descriptionKey: 'Earn {n} coins from playing',
-      targetValue: 400 + (hash % 5) * 100,
+      targetValue: 400 + Math.floor(lcg() * 5) * 100,
       currentValue: 0,
       completed: false,
       rewardCoins: 200,
       rewardXP: 500
     }
   ];
+
+  return [...selectedDailies, ...weeklyTemplates];
 }

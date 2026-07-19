@@ -667,6 +667,7 @@ export default function App() {
     GameStorage.saveStats(updatedStats);
 
     GameStorage.updateMissionProgress('weekly_coins', coinReward);
+    GameStorage.updateMissionProgress('daily_earn_coins', coinReward);
 
     handleXPAdd(xpReward);
 
@@ -682,6 +683,11 @@ export default function App() {
     // Daily missions checking
     const m1 = GameStorage.updateMissionProgress('daily_score', computedFinalScore);
     const m2 = GameStorage.updateMissionProgress('daily_games', 1);
+    if (mode === 'classic') {
+      GameStorage.updateMissionProgress('daily_win_classic', 1);
+    } else if (mode === 'relax') {
+      GameStorage.updateMissionProgress('daily_win_relax', 1);
+    }
     setMissions(GameStorage.getMissions());
 
     // Final profile reload to fetch rewards earned from mission and achievement completions
@@ -814,6 +820,7 @@ export default function App() {
           GameStorage.saveStats(nextStats);
 
           GameStorage.updateMissionProgress('weekly_coins', 2);
+          GameStorage.updateMissionProgress('daily_earn_coins', 2);
           GameStorage.updateAchievementProgress('coins', updatedProfile.coins);
           setProfile(GameStorage.getProfile());
         }
@@ -845,15 +852,18 @@ export default function App() {
           setClearedBombs(prev => prev + 1);
           GameStorage.updateAchievementProgress('special', 1, 'bomb');
           GameStorage.updateMissionProgress('weekly_bombs', 1);
+          GameStorage.updateMissionProgress('daily_trigger_bombs', 1);
           showToast('💣 BOMBA DETONADA COM SUCESSO! +150 PTS +2 MOEDAS', 'success');
         } else if (result.isIceBroken) {
           SynthAudio.playIceBreak(config.soundEnabled);
           setClearedIce(prev => prev + 1);
           GameStorage.updateAchievementProgress('special', 1, 'ice');
+          GameStorage.updateMissionProgress('daily_melt_ice', 1);
         } else if (result.isLockOpened) {
           SynthAudio.playUnlock(config.soundEnabled);
           setClearedLocks(prev => prev + 1);
           GameStorage.updateAchievementProgress('special', 1, 'lock');
+          GameStorage.updateMissionProgress('daily_unlock_locks', 1);
         } else {
           SynthAudio.playMatch(config.soundEnabled, combo);
         }
@@ -868,6 +878,7 @@ export default function App() {
             GameStorage.saveStats(nextStats);
           }
           GameStorage.updateMissionProgress('weekly_combos', nextCombo);
+          GameStorage.updateMissionProgress('daily_combo_streak', nextCombo);
           return nextCombo;
         });
 
@@ -945,6 +956,7 @@ export default function App() {
 
               SynthAudio.playExplosion(config.soundEnabled);
               GameStorage.updateMissionProgress('weekly_bombs', bombsDetonatedCount);
+              GameStorage.updateMissionProgress('daily_trigger_bombs', bombsDetonatedCount);
 
               explodedByBombs.forEach(eIdx => {
                 const bombExplosionId = Math.random().toString();

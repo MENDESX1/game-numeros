@@ -42,83 +42,84 @@ export class PathFinder {
   }
 
   /**
-   * Rule 2: Checks if there is a valid unblocked path between two cells.
-   * Path types allowed:
-   * 1. Same row (horizontal)
-   * 2. Same column (vertical)
-   * 3. Diagonal (any length, must have no active cells on the straight diagonal path)
-   * 4. 1D sequential wrapping (reading order from left-to-right, top-to-bottom, treating removed cells as transparent)
+   * Rule 2 & 3: Checks if there is a valid path between two cells using BFS.
+   * Empty cells (not active) are completely transparent and do not block.
+   * Only active numbers block.
    */
   static canConnect(idxA: number, idxB: number, cells: Cell[], cols: number, showDebugLogs: boolean = false): boolean {
     if (idxA === idxB) return false;
     if (!cells[idxA] || !cells[idxB]) return false;
 
-    const minIdx = Math.min(idxA, idxB);
-    const maxIdx = Math.max(idxA, idxB);
+    // BFS to find a path from idxA to idxB through non-active/empty cells
+    const visited = new Uint8Array(cells.length);
+    const queue: number[] = [idxA];
+    visited[idxA] = 1;
 
-    const r1 = Math.floor(minIdx / cols);
-    const c1 = minIdx % cols;
-    const r2 = Math.floor(maxIdx / cols);
-    const c2 = maxIdx % cols;
+    let head = 0;
+    while (head < queue.length) {
+      const u = queue[head++];
 
-    // --- 1. Same Row Check (Horizontal) ---
-    if (r1 === r2) {
-      let isBlocked = false;
-      // Check all intermediate columns on the same row. Only active numbers block.
-      for (let c = c1 + 1; c < c2; c++) {
-        const checkIdx = r1 * cols + c;
-        if (this.isActive(cells[checkIdx])) {
-          isBlocked = true;
-          break;
+      if (u === idxB) {
+        if (showDebugLogs) {
+          console.log(`[PathFinder] Path found between ${idxA} and ${idxB}`);
+        }
+        return true;
+      }
+
+      // Find neighbors
+      const neighbors: number[] = [];
+
+      // Grid position of u
+      const r = Math.floor(u / cols);
+      const c = u % cols;
+
+      // 1. Orthogonal directions
+      // Left
+      if (c > 0) neighbors.push(u - 1);
+      // Right
+      if (c < cols - 1) neighbors.push(u + 1);
+      // Up
+      if (r > 0) neighbors.push(u - cols);
+      // Down
+      if (u + cols < cells.length) neighbors.push(u + cols);
+
+      // 2. Diagonal directions
+      // Up-Left
+      if (r > 0 && c > 0) neighbors.push(u - cols - 1);
+      // Up-Right
+      if (r > 0 && c < cols - 1) neighbors.push(u - cols + 1);
+      // Down-Left
+      if (u + cols < cells.length && c > 0) neighbors.push(u + cols - 1);
+      // Down-Right
+      if (u + cols < cells.length && c < cols - 1) neighbors.push(u + cols + 1);
+
+      // 3. 1D sequential reading order wrapping
+      if (u > 0) neighbors.push(u - 1);
+      if (u < cells.length - 1) neighbors.push(u + 1);
+
+      for (let i = 0; i < neighbors.length; i++) {
+        const v = neighbors[i];
+        
+        // Prevent out of bounds
+        if (v < 0 || v >= cells.length) continue;
+        if (visited[v]) continue;
+
+        // Target cell can always be reached, regardless of whether it's active
+        if (v === idxB) {
+          return true;
+        }
+
+        // Only move to empty/inactive cells
+        if (!this.isActive(cells[v])) {
+          visited[v] = 1;
+          queue.push(v);
         }
       }
-      if (!isBlocked) return true;
     }
 
-    // --- 2. Same Column Check (Vertical) ---
-    if (c1 === c2) {
-      let isBlocked = false;
-      // Check all intermediate rows in the same column. Only active numbers block.
-      for (let r = r1 + 1; r < r2; r++) {
-        const checkIdx = r * cols + c1;
-        if (this.isActive(cells[checkIdx])) {
-          isBlocked = true;
-          break;
-        }
-      }
-      if (!isBlocked) return true;
+    if (showDebugLogs) {
+      console.log(`[PathFinder] No path found between ${idxA} and ${idxB}`);
     }
-
-    // --- 3. Straight Diagonal Check ---
-    if (Math.abs(r1 - r2) === Math.abs(c1 - c2)) {
-      const stepRow = 1; // Since minIdx has lower row than maxIdx, r1 < r2 is guaranteed
-      const stepCol = c1 < c2 ? 1 : -1;
-      let currRow = r1 + stepRow;
-      let currCol = c1 + stepCol;
-      let isBlocked = false;
-      while (currRow !== r2) {
-        const checkIdx = currRow * cols + currCol;
-        if (this.isActive(cells[checkIdx])) {
-          isBlocked = true;
-          break;
-        }
-        currRow += stepRow;
-        currCol += stepCol;
-      }
-      if (!isBlocked) return true;
-    }
-
-    // --- 4. 1D Sequential / Reading Order Check ---
-    // If all cells between minIdx and maxIdx are inactive, they are consecutive in 1D reading order.
-    let is1DBlocked = false;
-    for (let idx = minIdx + 1; idx < maxIdx; idx++) {
-      if (this.isActive(cells[idx])) {
-        is1DBlocked = true;
-        break;
-      }
-    }
-    if (!is1DBlocked) return true;
-
     return false;
   }
 
@@ -131,7 +132,6 @@ export class PathFinder {
       return false;
     }
     // 2. Path check
-    const connected = this.canConnect(idxA, idxB, cells, cols, showDebugLogs);
-    return connected;
+    return this.canConnect(idxA, idxB, cells, cols, showDebugLogs);
   }
 }
