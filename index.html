@@ -21,7 +21,7 @@
     <meta property="og:url" content="https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/" />
     <meta property="og:title" content="LogicMatch - O Melhor Jogo de Lógica e Números" />
     <meta property="og:description" content="LogicMatch é um viciante jogo de lógica e números com blocos especiais, desafios progressivos e múltiplos modos. Teste seu raciocínio lógico!" />
-    <meta property="og:image" content="https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/icon-512.png" />
+    <meta property="og:image" content="https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/Capa.png" />
     <meta property="og:site_name" content="LogicMatch" />
     <meta property="og:locale" content="pt_BR" />
 
@@ -29,26 +29,26 @@
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:url" content="https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/" />
     <meta property="twitter:title" content="LogicMatch - Jogo de Lógica e Números" />
-    <meta property="twitter:description" content="Um viciante jogo de lógica e números com blocos especiais e múltiplos modos." />
-    <meta property="twitter:image" content="https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/icon-512.png" />
+    <meta property="twitter:description" content="Um viciante jogo de lógica e números com blocos especiais and múltiplos modos." />
+    <meta property="twitter:image" content="https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/Capa.png" />
 
 
     
     <!-- Favicon configurations -->
-    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=4" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=4" />
-    <link rel="icon" type="image/png" href="/favicon.png?v=4" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=4" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=4" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=4" />
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json?v=4" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="LogicMatch">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     
     <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9840069917467020"
@@ -69,7 +69,7 @@
         "price": "0",
         "priceCurrency": "USD"
       },
-      "image": "https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/icon-512.png",
+      "image": "https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/Capa.png",
       "url": "https://ais-pre-wjwgeqg7fwogt27pyaykwn-442516840291.us-west2.run.app/",
       "author": {
         "@type": "Organization",
@@ -80,14 +80,32 @@
     
     <!-- PWA Service Worker Registration -->
     <script>
+      const isDev = window.location.hostname === 'localhost' || 
+                    window.location.hostname.includes('ais-dev') || 
+                    window.location.hostname.includes('ais-pre') || 
+                    window.location.hostname.includes('127.0.0.1') || 
+                    window.location.port !== '';
+
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(registration => {
-            console.log('SW registered: ', registration);
-          }).catch(registrationError => {
-            console.log('SW registration failed: ', registrationError);
+        if (isDev) {
+          // In development, unregister any existing service worker to avoid caching / dev resource load errors
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let registration of registrations) {
+              registration.unregister().then(() => {
+                console.log('[Service Worker] Unregistered successfully in development mode.');
+              });
+            }
           });
-        });
+        } else {
+          // In production, register the service worker for full PWA support
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+              console.log('SW registered successfully: ', registration);
+            }).catch(registrationError => {
+              console.warn('SW registration failed: ', registrationError);
+            });
+          });
+        }
       }
     </script>
   </head>

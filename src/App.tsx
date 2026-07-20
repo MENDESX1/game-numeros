@@ -11,7 +11,8 @@ import { SynthAudio } from './audio/synth';
 import {
   Play, Settings, Trophy, ShoppingBag, Target, BarChart3, ChevronLeft,
   Plus, Lightbulb, Clock, Flame, Coins, Crown, Sparkles, AlertCircle,
-  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Undo2, Heart, Infinity, Gift
+  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Undo2, Heart, Infinity, Gift,
+  Download, Smartphone
 } from 'lucide-react';
 
 // Components
@@ -166,6 +167,13 @@ export default function App() {
   // Modal displays
   const [activeModal, setActiveModal] = useState<'config' | 'stats' | 'missions' | 'achievements' | 'shop' | null>(null);
 
+  // PWA states
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
+    return window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+  });
+
   // FPS Counter state
   const [fps, setFps] = useState<number>(60);
   const [lastMatchTime, setLastMatchTime] = useState<number>(0);
@@ -241,6 +249,59 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // PWA Prompt event listener and state sync
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setShowInstallBanner(false);
+      showToast(config.language === 'pt' ? 'Aplicativo instalado com sucesso!' : config.language === 'es' ? '¡Aplicación instalada con éxito!' : 'App installed successfully!', 'success');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    // Also check standalone media query
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleStandaloneChange = (evt: MediaQueryListEvent) => {
+      setIsInstalled(evt.matches);
+    };
+    
+    // Support newer and older browser listeners
+    try {
+      mediaQuery.addEventListener('change', handleStandaloneChange);
+    } catch {
+      mediaQuery.addListener(handleStandaloneChange);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      try {
+        mediaQuery.removeEventListener('change', handleStandaloneChange);
+      } catch {
+        mediaQuery.removeListener(handleStandaloneChange);
+      }
+    };
+  }, [config.language]);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    SynthAudio.playClick(config.soundEnabled);
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+      setShowInstallBanner(false);
+    }
+    setDeferredPrompt(null);
+  };
 
   // Sync music state when config changes
   useEffect(() => {
@@ -1573,6 +1634,87 @@ export default function App() {
                     : 'Combine adjacent equal numbers or those that sum to 10. Unlock special themes and test your reflexes in exclusive modes.'}
                 </p>
               </div>
+
+              {/* PWA Install Banner */}
+              {!isInstalled && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className={`p-4 rounded-3xl border shadow-xl relative overflow-hidden ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}
+                >
+                  <div className="absolute top-3 right-3 z-10">
+                    <button
+                      onClick={() => {
+                        SynthAudio.playClick(config.soundEnabled);
+                        setIsInstalled(true); // Treat as dismissed for this session
+                      }}
+                      className={`p-1.5 rounded-full hover:bg-current/10 transition-colors ${activeTheme.textSecondary}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pr-6">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 text-indigo-500 shrink-0">
+                      <Smartphone className="w-6 h-6 animate-pulse" />
+                    </div>
+                    
+                    <div className="flex-1 text-center sm:text-left">
+                      <h4 className={`text-sm font-black uppercase tracking-wide ${activeTheme.textPrimary} mb-1`}>
+                        {config.language === 'pt' ? 'LogicMatch no Celular!' : config.language === 'es' ? '¡LogicMatch en tu Celular!' : 'LogicMatch on Mobile!'}
+                      </h4>
+                      <p className={`text-xs mb-3 ${activeTheme.textSecondary} leading-relaxed`}>
+                        {config.language === 'pt' 
+                          ? 'Instale o aplicativo PWA para jogar em tela cheia, offline, com melhor desempenho e acesso instantâneo de qualquer lugar.' 
+                          : config.language === 'es'
+                          ? 'Instala la aplicación PWA para jugar en pantalla completa, offline, con mejor rendimiento y acceso inmediato.'
+                          : 'Install the PWA app to play in fullscreen, offline, with better performance and instant access anywhere.'}
+                      </p>
+
+                      {/* Action buttons or custom guides */}
+                      {deferredPrompt ? (
+                        <button
+                          onClick={handleInstallClick}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold text-white shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                          style={{ backgroundColor: activeTheme.accentColor }}
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>
+                            {config.language === 'pt' ? 'Instalar Agora' : config.language === 'es' ? 'Instalar Ahora' : 'Install Now'}
+                          </span>
+                        </button>
+                      ) : (
+                        <div className={`p-2.5 rounded-xl text-[11px] font-medium leading-relaxed bg-current/[0.03] inline-block text-left ${activeTheme.textSecondary}`}>
+                          {/iPad|iPhone|iPod/.test(navigator.userAgent) ? (
+                            <span className="flex items-start gap-1.5">
+                              <span className="text-yellow-500 text-xs">💡</span>
+                              <span>
+                                {config.language === 'pt' 
+                                  ? 'No Safari, toque no ícone Compartilhar e selecione "Adicionar à Tela de Início".' 
+                                  : config.language === 'es'
+                                  ? 'En Safari, toca el icono Compartir y selecciona "Añadir a la pantalla de inicio".'
+                                  : 'In Safari, tap the Share icon and select "Add to Home Screen".'}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="flex items-start gap-1.5">
+                              <span className="text-indigo-500 text-xs">💡</span>
+                              <span>
+                                {config.language === 'pt' 
+                                  ? 'Abra o menu do navegador (três pontos) e toque em "Instalar Aplicativo".' 
+                                  : config.language === 'es'
+                                  ? 'Abre el menú del navegador (tres puntos) y toca "Instalar Aplicación".'
+                                  : 'Open your browser menu (three dots) and tap "Install App".'}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               {/* Bento Row: Primary Play Options (Resume Game / Campaign Mode) */}
               <div className="flex flex-col gap-3">
