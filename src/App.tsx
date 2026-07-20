@@ -660,9 +660,9 @@ export default function App() {
         objectiveTargetMet = true;
       }
 
-      // If the player meets the primary objective of the campaign level, they win!
+      // If the player meets the primary objective of the campaign level OR reaches the target score, they win!
       // We ensure they always pass by raising their final score to at least the level's target score if needed.
-      if (objectiveTargetMet) {
+      if (objectiveTargetMet || scoreTargetMet) {
         handleVictory(Math.max(scoreVal, lvl.targetScore));
       } else if (finalStep && GameEngine.checkVictory(cellsLeft)) {
         // Clear board but targets missed (fallback, though activeLeft === 0 already handled above)
@@ -1844,6 +1844,9 @@ export default function App() {
                   SynthAudio.playClick(config.soundEnabled);
                   startNewGame('challenge', 'medium', lvlId);
                 }}
+                levelPairsMatched={levelPairsMatched}
+                levelSumTenMatched={levelSumTenMatched}
+                cells={cells}
               />
             </div>
 

@@ -39,6 +39,9 @@ interface InfoPanelProps {
   challengeLevels: ChallengeLevel[];
   currentLevelUnlocked?: number;
   onSelectLevel?: (levelId: number) => void;
+  levelPairsMatched?: number;
+  levelSumTenMatched?: number;
+  cells?: any[];
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -63,7 +66,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   linesAddedCount,
   challengeLevels,
   currentLevelUnlocked,
-  onSelectLevel
+  onSelectLevel,
+  levelPairsMatched = 0,
+  levelSumTenMatched = 0,
+  cells = []
 }) => {
   const t = TRANSLATIONS[config.language];
   
@@ -96,7 +102,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   // Dynamic Name / Mode title
   const getModeTitle = () => {
     if (levelId && currentChallenge) {
-      return currentChallenge.titleKey;
+      if (config.language === 'pt') return currentChallenge.titlePT;
+      if (config.language === 'es') return currentChallenge.titleES;
+      return currentChallenge.titleEN;
     }
     const modeName = TRANSLATIONS[config.language][mode] || mode;
     return modeName.charAt(0).toUpperCase() + modeName.slice(1);
@@ -105,7 +113,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   // Dynamic Description / Goal
   const getGoalDescription = () => {
     if (levelId && currentChallenge) {
-      return currentChallenge.descKey;
+      if (config.language === 'pt') return currentChallenge.descPT;
+      if (config.language === 'es') return currentChallenge.descES;
+      return currentChallenge.descEN;
     }
     switch (mode) {
       case 'classic':
@@ -145,41 +155,56 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
         });
       }
 
-      // Special conditions
-      if (currentChallenge.specialCondition) {
-        const cond = currentChallenge.specialCondition;
+      // Objective conditions
+      if (currentChallenge.objective && currentChallenge.objective.type !== 'score') {
+        const obj = currentChallenge.objective;
         let curVal = 0;
-        let condLabel = getLabel(cond.type);
+        let objLabel = '';
 
-        if (cond.type === 'ice') curVal = clearedIce;
-        else if (cond.type === 'locks') curVal = clearedLocks;
-        else if (cond.type === 'bombs') curVal = clearedBombs;
-        else if (cond.type === 'no_hints') {
-          curVal = hintsUsed === 0 ? 1 : 0;
-          condLabel = getLabel('no_hints');
-        }
-        else if (cond.type === 'no_duplicates') {
-          curVal = linesAddedCount === 0 ? 1 : 0;
-          condLabel = getLabel('no_duplicates');
-        }
-        else if (cond.type === 'combo_streak') {
+        if (obj.type === 'pairs') {
+          curVal = levelPairsMatched;
+          objLabel = config.language === 'pt' ? 'Pares Combinados' : config.language === 'es' ? 'Parejas Combinadas' : 'Matched Pairs';
+        } else if (obj.type === 'sum_ten') {
+          curVal = levelSumTenMatched;
+          objLabel = config.language === 'pt' ? 'Soma 10 Encontrados' : config.language === 'es' ? 'Suma 10 Encontrados' : 'Sum 10 Matches';
+        } else if (obj.type === 'ice') {
+          curVal = clearedIce;
+          objLabel = config.language === 'pt' ? 'Gelo Derretido' : config.language === 'es' ? 'Hielo Derretido' : 'Ice Melted';
+        } else if (obj.type === 'locks') {
+          curVal = clearedLocks;
+          objLabel = config.language === 'pt' ? 'Cadeados Abertos' : config.language === 'es' ? 'Candados Abiertos' : 'Padlocks Opened';
+        } else if (obj.type === 'bombs') {
+          curVal = clearedBombs;
+          objLabel = config.language === 'pt' ? 'Bombas Desarmadas' : config.language === 'es' ? 'Bombas Desactivadas' : 'Bombs Defused';
+        } else if (obj.type === 'combos') {
           curVal = maxComboInLevel;
-          condLabel = getLabel('combo_streak');
-        }
-        else if (cond.type === 'cleared_numbers') {
-          curVal = clearedNumbersCount;
-          condLabel = getLabel('cleared_numbers');
-        }
-        else if (cond.type === 'supreme_zen') {
-          curVal = maxComboInLevel;
-          condLabel = `${getLabel('combo_streak')} (>=8x) & ${getLabel('no_hints')}`;
+          objLabel = config.language === 'pt' ? 'Combo Máximo' : config.language === 'es' ? 'Combo Máximo' : 'Max Combo';
+        } else if (obj.type === 'same_number') {
+          const targetVal = obj.targetValue || 7;
+          const startingCount = cells ? cells.filter(c => c.value === targetVal).length : 0;
+          const leftCount = cells ? cells.filter(c => !c.removed && c.value === targetVal).length : 0;
+          curVal = Math.max(0, Math.floor((startingCount - leftCount) / 2));
+          objLabel = config.language === 'pt' ? `Pares de ${targetVal}` : config.language === 'es' ? `Parejas de ${targetVal}` : `Pairs of ${targetVal}`;
+        } else if (obj.type === 'clear_board') {
+          const startingActive = cells ? cells.length : 1;
+          const activeLeft = cells ? cells.filter(c => !c.removed && c.value !== 0).length : 0;
+          curVal = startingActive - activeLeft;
+          objLabel = config.language === 'pt' ? 'Peças Removidas' : config.language === 'es' ? 'Fichas Eliminadas' : 'Cleared Pieces';
+          const condPercent = Math.min(100, Math.round((curVal / startingActive) * 100));
+          targets.push({
+            label: objLabel,
+            current: curVal,
+            target: startingActive,
+            percent: condPercent
+          });
+          return targets;
         }
 
-        const condPercent = Math.min(100, Math.round((curVal / cond.count) * 100));
+        const condPercent = Math.min(100, Math.round((curVal / obj.count) * 100));
         targets.push({
-          label: condLabel,
+          label: objLabel,
           current: curVal,
-          target: cond.count,
+          target: obj.count,
           percent: condPercent
         });
       }
