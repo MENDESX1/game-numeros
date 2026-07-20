@@ -1,4 +1,4 @@
-const CACHE_NAME = 'logicmatch-v4';
+const CACHE_NAME = 'logicmatch-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -55,16 +55,36 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  // For navigation/HTML requests, use Network-First strategy
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // If successful, clone response and cache it for offline fallback
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Network failed (offline), fall back to cached index.html
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // For all other static assets, use Cache-First, falling back to network
   event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then((response) => {
-      if (response) {
-        return response;
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
       }
       return fetch(event.request).catch((err) => {
         console.warn(`[Service Worker] Fetch failed for: ${event.request.url}`, err);
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
       });
     })
   );
