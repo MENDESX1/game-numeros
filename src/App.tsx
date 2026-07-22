@@ -11,8 +11,7 @@ import { SynthAudio } from './audio/synth';
 import {
   Play, Settings, Trophy, ShoppingBag, Target, BarChart3, ChevronLeft,
   Plus, Lightbulb, Clock, Flame, Coins, Crown, Sparkles, AlertCircle,
-  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Undo2, Heart, Infinity, Gift,
-  Download, Smartphone
+  HelpCircle, Volume2, RotateCcw, X, Info, Star, Shuffle, Undo2, Heart, Infinity, Gift
 } from 'lucide-react';
 
 // Components
@@ -109,6 +108,7 @@ export default function App() {
   const [clearedNumbersCount, setClearedNumbersCount] = useState<number>(0);
   const [levelPairsMatched, setLevelPairsMatched] = useState<number>(0);
   const [levelSumTenMatched, setLevelSumTenMatched] = useState<number>(0);
+  const [levelTargetValueMatched, setLevelTargetValueMatched] = useState<number>(0);
 
   // Mistakes/Lives, Shuffles, Locks, and Errors
   const [lives, setLives] = useState<number>(5);
@@ -507,6 +507,7 @@ export default function App() {
     setClearedNumbersCount(0);
     setLevelPairsMatched(0);
     setLevelSumTenMatched(0);
+    setLevelTargetValueMatched(0);
     setIsPaused(false);
     setShowRestartConfirm(false);
     setShowExitConfirm(false);
@@ -663,6 +664,7 @@ export default function App() {
     context?: { 
       pairsMatched?: number; 
       sumTenMatched?: number;
+      targetValueMatched?: number;
       clearedIce?: number; 
       clearedLocks?: number; 
       clearedBombs?: number; 
@@ -689,6 +691,7 @@ export default function App() {
       if (obj) {
         const currentPairs = context?.pairsMatched !== undefined ? context.pairsMatched : levelPairsMatched;
         const currentSumTen = context?.sumTenMatched !== undefined ? context.sumTenMatched : levelSumTenMatched;
+        const currentTargetValMatched = context?.targetValueMatched !== undefined ? context.targetValueMatched : levelTargetValueMatched;
         const currentIce = context?.clearedIce !== undefined ? context.clearedIce : clearedIce;
         const currentLocks = context?.clearedLocks !== undefined ? context.clearedLocks : clearedLocks;
         const currentBombs = context?.clearedBombs !== undefined ? context.clearedBombs : clearedBombs;
@@ -701,11 +704,7 @@ export default function App() {
         } else if (obj.type === 'clear_board') {
           objectiveTargetMet = activeLeft === 0;
         } else if (obj.type === 'same_number') {
-          const targetValue = obj.targetValue || 7;
-          const leftOfType = cellsLeft.filter(c => !c.removed && c.value === targetValue).length;
-          const startingOfType = cells.filter(c => c.value === targetValue).length;
-          const clearedPairs = Math.floor((startingOfType - leftOfType) / 2);
-          objectiveTargetMet = clearedPairs >= obj.count;
+          objectiveTargetMet = currentTargetValMatched >= obj.count;
         } else if (obj.type === 'sum_ten') {
           objectiveTargetMet = currentSumTen >= obj.count;
         } else if (obj.type === 'ice') {
@@ -898,6 +897,11 @@ export default function App() {
             const container = document.getElementById('app-container');
             if (container) {
               container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+            }
+            // Re-verify if added lines created available moves
+            const newMatches = GameEngine.getAvailableMatches(added, currentCols);
+            if (newMatches.length === 0 && GameEngine.getActiveIndices(added).length < 1500) {
+              checkBoardLock(added, currentCols);
             }
           }, 850);
         }, 800);
@@ -1117,6 +1121,13 @@ export default function App() {
           setLevelSumTenMatched(nextSumTenMatched);
         }
 
+        let nextTargetValueMatched = levelTargetValueMatched;
+        const currentLvlRef = levelId ? CHALLENGE_LEVELS.find(l => l.id === levelId) : undefined;
+        if (currentLvlRef?.objective?.type === 'same_number' && cellA.value === cellB.value && cellA.value === (currentLvlRef.objective.targetValue || 7)) {
+          nextTargetValueMatched += 1;
+          setLevelTargetValueMatched(nextTargetValueMatched);
+        }
+
         const nextIce = result.isIceBroken ? clearedIce + 1 : clearedIce;
         const nextLocks = result.isLockOpened ? clearedLocks + 1 : clearedLocks;
         const nextBombs = result.isBombTriggered ? clearedBombs + 1 : clearedBombs;
@@ -1152,6 +1163,7 @@ export default function App() {
           const contextVal = {
             pairsMatched: nextPairsMatched,
             sumTenMatched: nextSumTenMatched,
+            targetValueMatched: nextTargetValueMatched,
             clearedIce: nextIce,
             clearedLocks: nextLocks,
             clearedBombs: nextBombs,
@@ -1521,414 +1533,257 @@ export default function App() {
             <motion.div
               key="menu"
               id="menu-screen"
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
-              className="w-full max-w-2xl flex flex-col gap-6"
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="w-full max-w-xl flex flex-col gap-5"
             >
-              {/* Quick Stats Summary Card */}
+              {/* Minimalist Title Banner */}
+              <div className="text-center pt-1 pb-2 flex flex-col items-center gap-1">
+                <h1 className={`text-4xl sm:text-5xl font-black tracking-tight ${activeTheme.textPrimary}`}>
+                  Logic<span style={{ color: activeTheme.accentColor }}>Match</span>
+                </h1>
+                <p className={`text-xs font-medium opacity-60 tracking-wide ${activeTheme.textSecondary}`}>
+                  {config.language === 'pt' 
+                    ? 'Desafio de Lógica e Números' 
+                    : config.language === 'es'
+                    ? 'Desafío de Lógica y Números'
+                    : 'Logic & Number Challenge'}
+                </p>
+              </div>
+
+              {/* Compact Player Summary Card */}
               {(() => {
                 const totalStars = Object.values(levelStars).reduce((acc: number, val: any) => acc + (typeof val === 'number' ? val : 0), 0);
-                const md = modeDetails[config.language as 'pt' | 'en' | 'es'] || modeDetails.en;
-                
-                return (
-                  <div className={`grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 rounded-3xl border shadow-xl ${activeTheme.cardBg} backdrop-blur-md relative overflow-hidden`}>
-                    {/* Subtle decoration lines */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-current/[0.02] to-transparent pointer-events-none" />
-                    
-                    {/* Left: Avatar & XP Info */}
-                    <div className="sm:col-span-8 flex items-center gap-4">
-                      {(() => {
-                        const activeFrameItem = SHOP_ITEMS.find(item => item.id === profile.frame && item.category === 'frame');
-                        const frameClasses = activeFrameItem?.previewImage || 'border-transparent';
-                        return (
-                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner relative group transition-transform duration-300 hover:scale-110 ${frameClasses}`}>
-                            {profile.avatar === 'av_1' ? '🧘' : profile.avatar === 'av_2' ? '🧮' : profile.avatar === 'av_3' ? '💡' : profile.avatar === 'av_4' ? '⚔️' : profile.avatar === 'av_5' ? '🚀' : profile.avatar === 'av_6' ? '🐲' : profile.avatar === 'av_7' ? '🃏' : '🧙‍♂️'}
-                            <div className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full bg-yellow-500 text-white text-[8px] font-mono font-bold uppercase tracking-wider shadow-md z-10">
-                              LV {profile.level}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline mb-0.5">
-                          <span className={`text-base font-black uppercase tracking-wider ${activeTheme.textPrimary} flex items-center gap-1.5`}>
-                            Logic Master
-                            <Crown className="w-4 h-4 text-yellow-500 animate-pulse" />
-                          </span>
-                          <span className={`text-[10px] font-mono font-bold ${activeTheme.textSecondary}`}>XP {profile.xp} / {profile.level * 250}</span>
-                        </div>
-                        
-                        {/* Active Avatar Perk Info */}
-                        {(() => {
-                          const activeAvatar = SHOP_ITEMS.find(item => item.id === profile.avatar && item.category === 'avatar');
-                          const perkText = config.language === 'es' ? activeAvatar?.perkES : config.language === 'en' ? activeAvatar?.perkEN : activeAvatar?.perkPT;
-                          return activeAvatar ? (
-                            <div className="flex flex-col mb-1">
-                              <span className="text-[10px] font-extrabold text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                                <span>{activeAvatar.previewImage}</span>
-                                <span className="uppercase tracking-widest">{activeAvatar.nameKey}</span>
-                              </span>
-                              {perkText && (
-                                <p className={`text-[9px] opacity-75 leading-tight ${activeTheme.textSecondary}`}>
-                                  ⚡ {perkText}
-                                </p>
-                              )}
-                            </div>
-                          ) : null;
-                        })()}
+                const activeFrameItem = SHOP_ITEMS.find(item => item.id === profile.frame && item.category === 'frame');
+                const frameClasses = activeFrameItem?.previewImage || 'border-transparent';
 
-                        <div className="w-full h-1.5 bg-current/10 rounded-full overflow-hidden p-[1px]">
-                          <motion.div 
-                            className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full" 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(100, (profile.xp / (profile.level * 250)) * 100)}%` }}
-                            transition={{ duration: 0.8, ease: "easeOut" }}
+                return (
+                  <div className={`flex items-center justify-between gap-4 p-3.5 px-4 rounded-2xl border shadow-sm ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}>
+                    {/* Left: Avatar & XP */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-2xl shrink-0 shadow-sm relative ${frameClasses}`}>
+                        {profile.avatar === 'av_1' ? '🧘' : profile.avatar === 'av_2' ? '🧮' : profile.avatar === 'av_3' ? '💡' : profile.avatar === 'av_4' ? '⚔️' : profile.avatar === 'av_5' ? '🚀' : profile.avatar === 'av_6' ? '🐲' : profile.avatar === 'av_7' ? '🃏' : '🧙‍♂️'}
+                        <div className="absolute -bottom-1 -right-1 px-1 py-0.2 rounded-full bg-yellow-500 text-white text-[7px] font-mono font-bold uppercase shadow-sm">
+                          LV{profile.level}
+                        </div>
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-xs font-bold uppercase tracking-wide truncate ${activeTheme.textPrimary}`}>
+                          Logic Master
+                        </span>
+                        <div className="w-24 sm:w-32 h-1 bg-current/10 rounded-full overflow-hidden mt-1">
+                          <div 
+                            className="h-full bg-emerald-500 rounded-full" 
+                            style={{ width: `${Math.min(100, (profile.xp / (profile.level * 250)) * 100)}%` }}
                           />
                         </div>
                       </div>
                     </div>
 
-                    {/* Right: Quick Stars and Stats info */}
-                    <div className="sm:col-span-4 flex items-center justify-around sm:justify-end gap-6 sm:border-l sm:border-current/10 sm:pl-6">
-                      <div className="flex flex-col items-center">
-                        <span className={`text-[9px] font-mono uppercase tracking-widest opacity-65 mb-1 ${activeTheme.textSecondary}`}>
-                          {config.language === 'pt' ? 'Estrelas' : config.language === 'es' ? 'Estrellas' : 'Stars'}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-lg font-black text-yellow-500">
-                          <Star className="w-4.5 h-4.5 fill-current" />
-                          <span>{totalStars}</span>
-                        </div>
+                    {/* Right: Stars & Max Level */}
+                    <div className="flex items-center gap-4 text-xs font-bold shrink-0 border-l border-current/10 pl-4">
+                      <div className="flex items-center gap-1 text-yellow-500">
+                        <Star className="w-3.5 h-3.5 fill-current" />
+                        <span>{totalStars}</span>
                       </div>
-                      <div className="flex flex-col items-center">
-                        <span className={`text-[9px] font-mono uppercase tracking-widest opacity-65 mb-1 ${activeTheme.textSecondary}`}>
-                          {config.language === 'pt' ? 'Nível Máx' : config.language === 'es' ? 'Nivel Máx' : 'Max Level'}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-lg font-black" style={{ color: activeTheme.accentColor }}>
-                          <Target className="w-4.5 h-4.5" />
-                          <span>{currentLevelUnlocked - 1}</span>
-                        </div>
+                      <div className="flex items-center gap-1" style={{ color: activeTheme.accentColor }}>
+                        <Target className="w-3.5 h-3.5" />
+                        <span>LV {currentLevelUnlocked - 1}</span>
                       </div>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* Title display */}
-              <div className="text-center flex flex-col items-center gap-2 py-4 relative">
-                {/* Glowing ambient background effect for title */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-12 rounded-full opacity-[0.08] blur-xl pointer-events-none" style={{ backgroundColor: activeTheme.accentColor }} />
-                
-                <h2 className={`text-6xl font-black tracking-tighter leading-none ${activeTheme.textPrimary} flex items-center justify-center gap-1`}>
-                  Logic<span style={{ color: activeTheme.accentColor }}>Match</span>
-                </h2>
-                <p className="text-[11px] uppercase tracking-[0.25em] text-yellow-500 font-mono font-black">
-                  LOGIC MASTER
-                </p>
-                <p className={`text-xs font-normal mt-3 max-w-md mx-auto leading-relaxed opacity-75 ${activeTheme.textSecondary}`}>
-                  {config.language === 'pt' 
-                    ? 'Combine números adjacentes iguais ou que somem 10. Desbloqueie temas especiais e teste seus reflexos em modos exclusivos.' 
-                    : config.language === 'es'
-                    ? 'Combina números adyacentes iguales o que sumen 10. Desbloquea temas especiales y prueba tus reflejos en modos exclusivos.'
-                    : 'Combine adjacent equal numbers or those that sum to 10. Unlock special themes and test your reflexes in exclusive modes.'}
-                </p>
-              </div>
-
-              {/* PWA Install Banner */}
-              {!isInstalled && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className={`p-4 rounded-3xl border shadow-xl relative overflow-hidden ${activeTheme.cardBg} ${activeTheme.borderPrimary}`}
-                >
-                  <div className="absolute top-3 right-3 z-10">
-                    <button
-                      onClick={() => {
-                        SynthAudio.playClick(config.soundEnabled);
-                        setIsInstalled(true); // Treat as dismissed for this session
-                      }}
-                      className={`p-1.5 rounded-full hover:bg-current/10 transition-colors ${activeTheme.textSecondary}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pr-6">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 text-indigo-500 shrink-0">
-                      <Smartphone className="w-6 h-6 animate-pulse" />
-                    </div>
-                    
-                    <div className="flex-1 text-center sm:text-left">
-                      <h4 className={`text-sm font-black uppercase tracking-wide ${activeTheme.textPrimary} mb-1`}>
-                        {config.language === 'pt' ? 'LogicMatch no Celular!' : config.language === 'es' ? '¡LogicMatch en tu Celular!' : 'LogicMatch on Mobile!'}
-                      </h4>
-                      <p className={`text-xs mb-3 ${activeTheme.textSecondary} leading-relaxed`}>
-                        {config.language === 'pt' 
-                          ? 'Instale o aplicativo PWA para jogar em tela cheia, offline, com melhor desempenho e acesso instantâneo de qualquer lugar.' 
-                          : config.language === 'es'
-                          ? 'Instala la aplicación PWA para jugar en pantalla completa, offline, con mejor rendimiento y acceso inmediato.'
-                          : 'Install the PWA app to play in fullscreen, offline, with better performance and instant access anywhere.'}
-                      </p>
-
-                      {/* Action buttons or custom guides */}
-                      {deferredPrompt ? (
-                        <button
-                          onClick={handleInstallClick}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold text-white shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                          style={{ backgroundColor: activeTheme.accentColor }}
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>
-                            {config.language === 'pt' ? 'Instalar Agora' : config.language === 'es' ? 'Instalar Ahora' : 'Install Now'}
-                          </span>
-                        </button>
-                      ) : (
-                        <div className={`p-2.5 rounded-xl text-[11px] font-medium leading-relaxed bg-current/[0.03] inline-block text-left ${activeTheme.textSecondary}`}>
-                          {/iPad|iPhone|iPod/.test(navigator.userAgent) ? (
-                            <span className="flex items-start gap-1.5">
-                              <span className="text-yellow-500 text-xs">💡</span>
-                              <span>
-                                {config.language === 'pt' 
-                                  ? 'No Safari, toque no ícone Compartilhar e selecione "Adicionar à Tela de Início".' 
-                                  : config.language === 'es'
-                                  ? 'En Safari, toca el icono Compartir y selecciona "Añadir a la pantalla de inicio".'
-                                  : 'In Safari, tap the Share icon and select "Add to Home Screen".'}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="flex items-start gap-1.5">
-                              <span className="text-indigo-500 text-xs">💡</span>
-                              <span>
-                                {config.language === 'pt' 
-                                  ? 'Abra o menu do navegador (três pontos) e toque em "Instalar Aplicativo".' 
-                                  : config.language === 'es'
-                                  ? 'Abre el menú del navegador (tres puntos) y toca "Instalar Aplicación".'
-                                  : 'Open your browser menu (three dots) and tap "Install App".'}
-                              </span>
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Bento Row: Primary Play Options (Resume Game / Campaign Mode) */}
-              <div className="flex flex-col gap-3">
+              {/* Main Play CTA Actions */}
+              <div className="flex flex-col gap-2.5">
                 {(() => {
                   const md = modeDetails[config.language as 'pt' | 'en' | 'es'] || modeDetails.en;
                   
                   return (
-                    <div className={`grid grid-cols-1 ${activeSavedGame ? 'sm:grid-cols-2' : 'grid-cols-1'} gap-4`}>
-                      {/* Active Saved Game - Gold accent */}
+                    <div className={`grid grid-cols-1 ${activeSavedGame ? 'sm:grid-cols-2' : 'grid-cols-1'} gap-3`}>
+                      {/* Active Saved Game */}
                       {activeSavedGame && (
-                        <motion.button
+                        <button
                           id="resume-game-btn"
                           onClick={resumeGame}
-                          whileHover={{ y: -2 }}
-                          whileTap={{ y: 2 }}
-                          className="p-5 rounded-2xl font-bold text-left cursor-pointer transition-all border-2 border-b-6 border-orange-500/40 bg-orange-500/5 hover:bg-orange-500/10 border-b-orange-600 relative overflow-hidden group shadow-md"
+                          className="p-4 rounded-xl font-bold text-left cursor-pointer transition-all border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/15 text-orange-500 flex items-center justify-between shadow-sm active:scale-[0.99]"
                         >
-                          <div className="absolute right-3 top-3 opacity-15 group-hover:opacity-25 transition-opacity">
-                            <Play className="w-12 h-12 fill-orange-500 text-orange-500" />
+                          <div>
+                            <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest font-bold opacity-80 mb-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                              <span>{config.language === 'pt' ? 'Partida Salva' : config.language === 'es' ? 'Partida Guardada' : 'Saved Game'}</span>
+                            </div>
+                            <h3 className="text-base font-black uppercase">
+                              {md.resume.title}
+                            </h3>
                           </div>
-                          <div className="flex items-center gap-2 text-[10px] font-mono text-orange-500 uppercase tracking-widest mb-1 font-bold">
-                            <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
-                            <span>{config.language === 'pt' ? 'Partida Salva' : config.language === 'es' ? 'Partida Guardada' : 'Saved Game'}</span>
-                          </div>
-                          <h3 className="text-lg font-black text-orange-500 uppercase tracking-tight">
-                            {md.resume.title}
-                          </h3>
-                          <p className={`text-xs font-medium opacity-80 mt-1 line-clamp-1 ${activeTheme.textSecondary}`}>
-                            {md.resume.desc}
-                          </p>
-                        </motion.button>
+                          <Play className="w-5 h-5 fill-current shrink-0" />
+                        </button>
                       )}
 
-                      {/* Campaign / Levels Card */}
-                      <motion.button
+                      {/* Campaign / Levels Button */}
+                      <button
                         id="play-campaign-btn"
                         onClick={() => {
                           SynthAudio.playClick(config.soundEnabled);
                           setView('levels');
                         }}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ y: 2 }}
-                        className={`p-5 rounded-2xl font-bold text-left cursor-pointer transition-all border-2 border-b-6 relative overflow-hidden group shadow-md ${
-                          activeSavedGame 
-                            ? 'border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10 border-b-yellow-600' 
-                            : 'border-yellow-500/50 bg-yellow-500/10 hover:bg-yellow-500/15 border-b-yellow-500'
-                        }`}
+                        className={`p-4 rounded-xl font-bold text-left cursor-pointer transition-all border shadow-sm flex items-center justify-between active:scale-[0.99] ${activeTheme.primaryBtn}`}
                       >
-                        <div className="absolute right-3 top-3 opacity-15 group-hover:opacity-25 transition-opacity">
-                          <Star className="w-12 h-12 fill-yellow-500 text-yellow-500" />
+                        <div>
+                          <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest opacity-80 mb-0.5 font-bold">
+                            <Crown className="w-3 h-3" />
+                            <span>{config.language === 'pt' ? 'Mapa de Fases' : config.language === 'es' ? 'Mapa de Niveles' : 'Campaign Mode'}</span>
+                          </div>
+                          <h3 className="text-base font-black uppercase">
+                            {md.campaign.title}
+                          </h3>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-500 uppercase tracking-widest mb-1 font-bold">
-                          <Crown className="w-3.5 h-3.5" />
-                          <span>{config.language === 'pt' ? 'Mapa de Fases' : config.language === 'es' ? 'Mapa de Niveles' : 'Campaign Mode'}</span>
-                        </div>
-                        <h3 className="text-lg font-black text-yellow-500 uppercase tracking-tight">
-                          {md.campaign.title}
-                        </h3>
-                        <p className={`text-xs font-medium opacity-85 mt-1 ${activeTheme.textSecondary}`}>
-                          {config.language === 'pt' 
-                            ? `Fases Completas: ${currentLevelUnlocked - 1} / ${CHALLENGE_LEVELS.length}` 
-                            : config.language === 'es'
-                            ? `Niveles Completados: ${currentLevelUnlocked - 1} / ${CHALLENGE_LEVELS.length}`
-                            : `Levels Cleared: ${currentLevelUnlocked - 1} / ${CHALLENGE_LEVELS.length}`}
-                        </p>
-                      </motion.button>
+                        <span className="text-xs opacity-80 font-mono">
+                          {currentLevelUnlocked - 1}/{CHALLENGE_LEVELS.length}
+                        </span>
+                      </button>
                     </div>
                   );
                 })()}
               </div>
 
-              {/* Core Game Modes Grid */}
-              <div className="flex flex-col gap-3">
-                <h4 className={`text-[10px] font-mono uppercase tracking-[0.25em] font-black opacity-60 mb-1 border-b pb-2 border-current/10 ${activeTheme.textSecondary}`}>
-                  {config.language === 'pt' ? 'Modos de Jogo Tradicionais' : config.language === 'es' ? 'Modos de Juego Tradicionales' : 'Traditional Game Modes'}
+              {/* Game Modes Grid */}
+              <div className="flex flex-col gap-2.5">
+                <h4 className={`text-[10px] font-mono uppercase tracking-widest font-bold opacity-50 px-1 ${activeTheme.textSecondary}`}>
+                  {config.language === 'pt' ? 'Modos de Jogo' : config.language === 'es' ? 'Modos de Juego' : 'Game Modes'}
                 </h4>
                 
                 {(() => {
                   const md = modeDetails[config.language as 'pt' | 'en' | 'es'] || modeDetails.en;
                   
                   return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {/* Classic Mode - Purple / Amethyst */}
-                      <motion.button
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Classic */}
+                      <button
                         id="play-classic-btn"
                         onClick={() => startNewGame('classic', 'medium')}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ y: 2 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-purple-500/20 bg-purple-500/[0.02] hover:bg-purple-500/[0.05] border-b-purple-600/50 relative group overflow-hidden`}
+                        className={`p-3.5 rounded-xl text-left cursor-pointer transition-all border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-purple-500/40 hover:bg-purple-500/[0.03] active:scale-[0.98] group flex items-center justify-between`}
                       >
-                        <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                          <Play className="w-10 h-10 text-purple-500" />
+                        <div>
+                          <h5 className="text-xs font-black text-purple-500 uppercase tracking-wide">
+                            {t.classic}
+                          </h5>
+                          <p className={`text-[10px] opacity-60 leading-tight mt-0.5 ${activeTheme.textSecondary}`}>
+                            {md.classic.desc}
+                          </p>
                         </div>
-                        <h5 className="text-sm font-black text-purple-500 uppercase tracking-wider mb-0.5">
-                          {t.classic}
-                        </h5>
-                        <p className={`text-[11px] opacity-75 leading-snug font-medium ${activeTheme.textSecondary}`}>
-                          {md.classic.desc}
-                        </p>
-                      </motion.button>
+                        <Play className="w-4 h-4 text-purple-500 opacity-60 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+                      </button>
 
-                      {/* Zen/Relax Mode - Emerald Green */}
-                      <motion.button
+                      {/* Zen/Relax */}
+                      <button
                         id="play-relax-btn"
                         onClick={() => startNewGame('relax', 'easy')}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ y: 2 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-emerald-500/20 bg-emerald-500/[0.02] hover:bg-emerald-500/[0.05] border-b-emerald-600/50 relative group overflow-hidden`}
+                        className={`p-3.5 rounded-xl text-left cursor-pointer transition-all border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-emerald-500/40 hover:bg-emerald-500/[0.03] active:scale-[0.98] group flex items-center justify-between`}
                       >
-                        <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                          <Sparkles className="w-10 h-10 text-emerald-500" />
+                        <div>
+                          <h5 className="text-xs font-black text-emerald-500 uppercase tracking-wide">
+                            {t.relax}
+                          </h5>
+                          <p className={`text-[10px] opacity-60 leading-tight mt-0.5 ${activeTheme.textSecondary}`}>
+                            {md.relax.desc}
+                          </p>
                         </div>
-                        <h5 className="text-sm font-black text-emerald-500 uppercase tracking-wider mb-0.5">
-                          {t.relax}
-                        </h5>
-                        <p className={`text-[11px] opacity-75 leading-snug font-medium ${activeTheme.textSecondary}`}>
-                          {md.relax.desc}
-                        </p>
-                      </motion.button>
+                        <Sparkles className="w-4 h-4 text-emerald-500 opacity-60 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+                      </button>
 
-                      {/* Timed Mode - Sky Blue */}
-                      <motion.button
+                      {/* Timed */}
+                      <button
                         id="play-timed-btn"
                         onClick={() => startNewGame('timed', 'hard')}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ y: 2 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-sky-500/20 bg-sky-500/[0.02] hover:bg-sky-500/[0.05] border-b-sky-600/50 relative group overflow-hidden`}
+                        className={`p-3.5 rounded-xl text-left cursor-pointer transition-all border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-sky-500/40 hover:bg-sky-500/[0.03] active:scale-[0.98] group flex items-center justify-between`}
                       >
-                        <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                          <Clock className="w-10 h-10 text-sky-500" />
+                        <div>
+                          <h5 className="text-xs font-black text-sky-500 uppercase tracking-wide">
+                            {t.timed}
+                          </h5>
+                          <p className={`text-[10px] opacity-60 leading-tight mt-0.5 ${activeTheme.textSecondary}`}>
+                            {md.timed.desc}
+                          </p>
                         </div>
-                        <h5 className="text-sm font-black text-sky-500 uppercase tracking-wider mb-0.5">
-                          {t.timed}
-                        </h5>
-                        <p className={`text-[11px] opacity-75 leading-snug font-medium ${activeTheme.textSecondary}`}>
-                          {md.timed.desc}
-                        </p>
-                      </motion.button>
+                        <Clock className="w-4 h-4 text-sky-500 opacity-60 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+                      </button>
 
-                      {/* Survival Mode - Rose Red */}
-                      <motion.button
+                      {/* Survival */}
+                      <button
                         id="play-survival-btn"
                         onClick={() => startNewGame('survival', 'hard')}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ y: 2 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-rose-500/20 bg-rose-500/[0.02] hover:bg-rose-500/[0.05] border-b-rose-600/50 relative group overflow-hidden`}
+                        className={`p-3.5 rounded-xl text-left cursor-pointer transition-all border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-rose-500/40 hover:bg-rose-500/[0.03] active:scale-[0.98] group flex items-center justify-between`}
                       >
-                        <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                          <Flame className="w-10 h-10 text-rose-500" />
+                        <div>
+                          <h5 className="text-xs font-black text-rose-500 uppercase tracking-wide">
+                            {t.survival}
+                          </h5>
+                          <p className={`text-[10px] opacity-60 leading-tight mt-0.5 ${activeTheme.textSecondary}`}>
+                            {md.survival.desc}
+                          </p>
                         </div>
-                        <h5 className="text-sm font-black text-rose-500 uppercase tracking-wider mb-0.5">
-                          {t.survival}
-                        </h5>
-                        <p className={`text-[11px] opacity-75 leading-snug font-medium ${activeTheme.textSecondary}`}>
-                          {md.survival.desc}
-                        </p>
-                      </motion.button>
+                        <Flame className="w-4 h-4 text-rose-500 opacity-60 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+                      </button>
 
-                      {/* Infinite Mode - Indigo / Violet */}
-                      <motion.button
+                      {/* Infinite */}
+                      <button
                         id="play-infinite-btn"
                         onClick={() => startNewGame('infinite', 'hard')}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ y: 2 }}
-                        className={`p-4 rounded-2xl text-left cursor-pointer transition-all border-2 border-b-6 border-indigo-500/20 bg-indigo-500/[0.02] hover:bg-indigo-500/[0.05] border-b-indigo-600/50 relative col-span-1 sm:col-span-2 group overflow-hidden`}
+                        className={`p-3.5 rounded-xl text-left cursor-pointer transition-all border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-indigo-500/40 hover:bg-indigo-500/[0.03] active:scale-[0.98] group flex items-center justify-between sm:col-span-2`}
                       >
-                        <div className="absolute right-4 top-3.5 opacity-10 group-hover:opacity-20 transition-opacity">
-                          <Infinity className="w-10 h-10 text-indigo-500" />
+                        <div>
+                          <h5 className="text-xs font-black text-indigo-500 uppercase tracking-wide">
+                            {t.infinite}
+                          </h5>
+                          <p className={`text-[10px] opacity-60 leading-tight mt-0.5 ${activeTheme.textSecondary}`}>
+                            {md.infinite.desc}
+                          </p>
                         </div>
-                        <h5 className="text-sm font-black text-indigo-500 uppercase tracking-wider mb-0.5">
-                          {t.infinite}
-                        </h5>
-                        <p className={`text-[11px] opacity-75 leading-snug font-medium ${activeTheme.textSecondary}`}>
-                          {md.infinite.desc}
-                        </p>
-                      </motion.button>
+                        <Infinity className="w-4 h-4 text-indigo-500 opacity-60 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+                      </button>
                     </div>
                   );
                 })()}
               </div>
-              
-              {/* Navigation Drawer Shortcuts - Bento Grid style bar */}
-              <div className={`grid grid-cols-4 gap-2 pt-4 border-t ${activeTheme.borderPrimary}`}>
+
+              {/* Navigation Bar */}
+              <div className={`grid grid-cols-4 gap-2 pt-2`}>
                 <button
                   id="drawer-missions"
                   onClick={() => { SynthAudio.playClick(config.soundEnabled); setActiveModal('missions'); }}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border border-transparent hover:border-current/10 hover:bg-current/[0.02] text-[10px] uppercase tracking-widest transition-all opacity-85 hover:opacity-100 ${activeTheme.textSecondary} hover:${activeTheme.textPrimary}`}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-current/20 text-[10px] uppercase font-bold tracking-wider transition-all opacity-70 hover:opacity-100 ${activeTheme.textSecondary}`}
                 >
-                  <Target className="w-5 h-5 mb-0.5" />
-                  <span className="font-bold scale-90 sm:scale-100">{t.missions}</span>
+                  <Target className="w-4 h-4" />
+                  <span>{t.missions}</span>
                 </button>
                 <button
                   id="drawer-achievements"
                   onClick={() => { SynthAudio.playClick(config.soundEnabled); setActiveModal('achievements'); }}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border border-transparent hover:border-current/10 hover:bg-current/[0.02] text-[10px] uppercase tracking-widest transition-all opacity-85 hover:opacity-100 ${activeTheme.textSecondary} hover:${activeTheme.textPrimary}`}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-current/20 text-[10px] uppercase font-bold tracking-wider transition-all opacity-70 hover:opacity-100 ${activeTheme.textSecondary}`}
                 >
-                  <Trophy className="w-5 h-5 mb-0.5" />
-                  <span className="font-bold scale-90 sm:scale-100">{t.achievements}</span>
+                  <Trophy className="w-4 h-4" />
+                  <span>{t.achievements}</span>
                 </button>
                 <button
                   id="drawer-shop"
                   onClick={() => { SynthAudio.playClick(config.soundEnabled); setActiveModal('shop'); }}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border border-transparent hover:border-current/10 hover:bg-current/[0.02] text-[10px] uppercase tracking-widest transition-all opacity-85 hover:opacity-100 ${activeTheme.textSecondary} hover:${activeTheme.textPrimary}`}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-current/20 text-[10px] uppercase font-bold tracking-wider transition-all opacity-70 hover:opacity-100 ${activeTheme.textSecondary}`}
                 >
-                  <ShoppingBag className="w-5 h-5 mb-0.5" />
-                  <span className="font-bold scale-90 sm:scale-100">{t.shop}</span>
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>{t.shop}</span>
                 </button>
                 <button
                   id="drawer-stats"
                   onClick={() => { SynthAudio.playClick(config.soundEnabled); setActiveModal('stats'); }}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border border-transparent hover:border-current/10 hover:bg-current/[0.02] text-[10px] uppercase tracking-widest transition-all opacity-85 hover:opacity-100 ${activeTheme.textSecondary} hover:${activeTheme.textPrimary}`}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border ${activeTheme.cardBg} ${activeTheme.borderPrimary} hover:border-current/20 text-[10px] uppercase font-bold tracking-wider transition-all opacity-70 hover:opacity-100 ${activeTheme.textSecondary}`}
                 >
-                  <BarChart3 className="w-5 h-5 mb-0.5" />
-                  <span className="font-bold scale-90 sm:scale-100">{t.stats}</span>
+                  <BarChart3 className="w-4 h-4" />
+                  <span>{t.stats}</span>
                 </button>
               </div>
             </motion.div>

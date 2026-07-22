@@ -317,11 +317,16 @@ export const GameGrid: React.FC<GameGridProps> = React.memo(({
     </div>
   );
 }, (prev, next) => {
+  const errorEqual = prev.errorIndices.length === next.errorIndices.length &&
+    prev.errorIndices.every((val, idx) => val === next.errorIndices[idx]);
+  const highlightEqual = prev.highlightedIndices.length === next.highlightedIndices.length &&
+    prev.highlightedIndices.every((val, idx) => val === next.highlightedIndices[idx]);
+
   return (
     prev.cells === next.cells &&
     prev.selectedIndex === next.selectedIndex &&
-    prev.highlightedIndices === next.highlightedIndices &&
-    prev.errorIndices.length === next.errorIndices.length &&
+    highlightEqual &&
+    errorEqual &&
     prev.animatingMatch === next.animatingMatch &&
     prev.activeExplosions === next.activeExplosions &&
     prev.floatingScores === next.floatingScores &&
