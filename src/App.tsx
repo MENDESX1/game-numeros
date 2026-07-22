@@ -887,7 +887,7 @@ export default function App() {
           setIsShuffling(true); // just use the animation flag for visual effect
           SynthAudio.playShuffle(config.soundEnabled);
           
-          const added = GameEngine.addNumbers(currentCells, currentCols, config.difficulty);
+          const added = GameEngine.addNumbers(currentCells, currentCols, difficulty);
           setCells(added);
           setLinesAddedCount(prev => prev + 1);
           
@@ -1204,17 +1204,7 @@ export default function App() {
             });
 
             if (bombsDetonatedCount > 0) {
-              if (mode === 'survival') {
-                setLives(prev => {
-                  const damage = bombsDetonatedCount * 2;
-                  const nextLives = Math.max(0, prev - damage);
-                  // Game over removed
-                  return nextLives;
-                });
-                showToast(`💥 ${bombsDetonatedCount} BOMBA(S) DETONARAM! -${bombsDetonatedCount * 2} VIDAS!`, 'error');
-              } else {
-                showToast(`💥 ${bombsDetonatedCount} BOMBA(S) DETONARAM!`, 'error');
-              }
+              showToast(`💥 ${bombsDetonatedCount} BOMBA(S) DETONARAM!`, 'error');
 
               SynthAudio.playExplosion(config.soundEnabled);
               GameStorage.updateMissionProgress('weekly_bombs', bombsDetonatedCount);
@@ -1335,7 +1325,7 @@ export default function App() {
     }
     saveHistory();
     SynthAudio.playClick(config.soundEnabled);
-    const nextCells = GameEngine.addNumbers(cells, cols, config.difficulty);
+    const nextCells = GameEngine.addNumbers(cells, cols, difficulty);
     setCells(nextCells);
     setSelectedIndex(null);
     setLinesAddedCount(prev => prev + 1);

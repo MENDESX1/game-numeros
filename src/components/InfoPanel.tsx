@@ -1,5 +1,5 @@
 import React from 'react';
-import { GameConfig, ChallengeLevel } from '../types';
+import { GameConfig, ChallengeLevel, GameMode } from '../types';
 import { TRANSLATIONS } from '../config/gameConfig';
 import { 
   Trophy, 
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 interface InfoPanelProps {
-  mode: 'classic' | 'relax' | 'timed' | 'challenge' | 'survival' | 'frozen' | 'bombs' | 'locks' | 'infinite';
+  mode: GameMode;
   levelId: number | null;
   score: number;
   highScore: number;

@@ -61,6 +61,43 @@ const DEFAULT_PROFILE: UserProfile = {
   unlockedFrames: ['fr_1']
 };
 
+const memoryStore = new Map<string, string>();
+
+export const safeLocalStorage = {
+  getItem(key: string): string | null {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      console.warn('LocalStorage access error:', e);
+    }
+    return memoryStore.get(key) ?? null;
+  },
+  setItem(key: string, value: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+        return;
+      }
+    } catch (e) {
+      console.warn('LocalStorage setItem error:', e);
+    }
+    memoryStore.set(key, value);
+  },
+  removeItem(key: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+        return;
+      }
+    } catch (e) {
+      console.warn('LocalStorage removeItem error:', e);
+    }
+    memoryStore.delete(key);
+  }
+};
+
 const DB_NAME = 'LogicMatchDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'game_store';
@@ -125,7 +162,7 @@ export const IndexedDBBridge = {
       for (const key of keys) {
         const val = await this.get(key);
         if (val !== undefined && val !== null) {
-          localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+          safeLocalStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
         }
       }
     } catch (e) {
@@ -137,7 +174,7 @@ export const IndexedDBBridge = {
     try {
       const keys = Object.values(STORAGE_KEYS);
       for (const key of keys) {
-        const val = localStorage.getItem(key);
+        const val = safeLocalStorage.getItem(key);
         if (val !== null) {
           try {
             await this.set(key, JSON.parse(val));
@@ -154,37 +191,37 @@ export const IndexedDBBridge = {
 
 export const GameStorage = {
   getConfig(): GameConfig {
-    const data = localStorage.getItem(STORAGE_KEYS.CONFIG);
+    const data = safeLocalStorage.getItem(STORAGE_KEYS.CONFIG);
     return data ? { ...DEFAULT_CONFIG, ...JSON.parse(data) } : DEFAULT_CONFIG;
   },
 
   saveConfig(config: GameConfig) {
-    localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
+    safeLocalStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
     IndexedDBBridge.set(STORAGE_KEYS.CONFIG, config);
   },
 
   getStats(): UserStats {
-    const data = localStorage.getItem(STORAGE_KEYS.STATS);
+    const data = safeLocalStorage.getItem(STORAGE_KEYS.STATS);
     return data ? { ...DEFAULT_STATS, ...JSON.parse(data) } : DEFAULT_STATS;
   },
 
   saveStats(stats: UserStats) {
-    localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
+    safeLocalStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
     IndexedDBBridge.set(STORAGE_KEYS.STATS, stats);
   },
 
   getProfile(): UserProfile {
-    const data = localStorage.getItem(STORAGE_KEYS.PROFILE);
+    const data = safeLocalStorage.getItem(STORAGE_KEYS.PROFILE);
     return data ? { ...DEFAULT_PROFILE, ...JSON.parse(data) } : DEFAULT_PROFILE;
   },
 
   saveProfile(profile: UserProfile) {
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    safeLocalStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
     IndexedDBBridge.set(STORAGE_KEYS.PROFILE, profile);
   },
 
   getAchievements(): Achievement[] {
-    const data = localStorage.getItem(STORAGE_KEYS.ACHIEVEMENTS);
+    const data = safeLocalStorage.getItem(STORAGE_KEYS.ACHIEVEMENTS);
     if (!data) return DEFAULT_ACHIEVEMENTS;
     
     // Merge default structure in case we update achievements list in code
@@ -196,20 +233,20 @@ export const GameStorage = {
   },
 
   saveAchievements(achievements: Achievement[]) {
-    localStorage.setItem(STORAGE_KEYS.ACHIEVEMENTS, JSON.stringify(achievements));
+    safeLocalStorage.setItem(STORAGE_KEYS.ACHIEVEMENTS, JSON.stringify(achievements));
     IndexedDBBridge.set(STORAGE_KEYS.ACHIEVEMENTS, achievements);
   },
 
   getMissions(): GameMission[] {
     const todayStr = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local format
-    const savedDate = localStorage.getItem(STORAGE_KEYS.MISSIONS_DATE);
-    const data = localStorage.getItem(STORAGE_KEYS.MISSIONS);
+    const savedDate = safeLocalStorage.getItem(STORAGE_KEYS.MISSIONS_DATE);
+    const data = safeLocalStorage.getItem(STORAGE_KEYS.MISSIONS);
 
     if (savedDate !== todayStr || !data) {
       // New day: generate fresh missions
       const freshMissions = getMissions(todayStr);
-      localStorage.setItem(STORAGE_KEYS.MISSIONS_DATE, todayStr);
-      localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(freshMissions));
+      safeLocalStorage.setItem(STORAGE_KEYS.MISSIONS_DATE, todayStr);
+      safeLocalStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(freshMissions));
       IndexedDBBridge.set(STORAGE_KEYS.MISSIONS_DATE, todayStr);
       IndexedDBBridge.set(STORAGE_KEYS.MISSIONS, freshMissions);
       return freshMissions;
@@ -219,7 +256,7 @@ export const GameStorage = {
   },
 
   saveMissions(missions: GameMission[]) {
-    localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(missions));
+    safeLocalStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(missions));
     IndexedDBBridge.set(STORAGE_KEYS.MISSIONS, missions);
   },
 
@@ -369,20 +406,20 @@ export const GameStorage = {
   },
 
   clearAllData() {
-    localStorage.removeItem(STORAGE_KEYS.CONFIG);
-    localStorage.removeItem(STORAGE_KEYS.STATS);
-    localStorage.removeItem(STORAGE_KEYS.PROFILE);
-    localStorage.removeItem(STORAGE_KEYS.ACHIEVEMENTS);
-    localStorage.removeItem(STORAGE_KEYS.MISSIONS);
-    localStorage.removeItem(STORAGE_KEYS.MISSIONS_DATE);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
+    safeLocalStorage.removeItem(STORAGE_KEYS.CONFIG);
+    safeLocalStorage.removeItem(STORAGE_KEYS.STATS);
+    safeLocalStorage.removeItem(STORAGE_KEYS.PROFILE);
+    safeLocalStorage.removeItem(STORAGE_KEYS.ACHIEVEMENTS);
+    safeLocalStorage.removeItem(STORAGE_KEYS.MISSIONS);
+    safeLocalStorage.removeItem(STORAGE_KEYS.MISSIONS_DATE);
+    safeLocalStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
     
     Object.values(STORAGE_KEYS).forEach(key => {
       IndexedDBBridge.set(key, null);
     });
 
     // Clear caches if available in browser
-    if ('caches' in window) {
+    if (typeof window !== 'undefined' && 'caches' in window) {
       caches.keys().then(names => {
         for (const name of names) {
           caches.delete(name);
@@ -391,7 +428,7 @@ export const GameStorage = {
     }
 
     // Unregister service workers if available
-    if ('serviceWorker' in navigator) {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         for (const registration of registrations) {
           registration.unregister();
@@ -407,7 +444,7 @@ export const GameStorage = {
       profile: this.getProfile(),
       achievements: this.getAchievements(),
       missions: this.getMissions(),
-      missionsDate: localStorage.getItem(STORAGE_KEYS.MISSIONS_DATE)
+      missionsDate: safeLocalStorage.getItem(STORAGE_KEYS.MISSIONS_DATE)
     };
     return btoa(JSON.stringify(data)); // return base64 encoded string
   },
@@ -417,15 +454,15 @@ export const GameStorage = {
       const decoded = atob(base64Str);
       const parsed = JSON.parse(decoded);
       if (parsed.config && parsed.stats && parsed.profile && parsed.achievements) {
-        localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsed.config));
-        localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(parsed.stats));
-        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(parsed.profile));
-        localStorage.setItem(STORAGE_KEYS.ACHIEVEMENTS, JSON.stringify(parsed.achievements));
+        safeLocalStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsed.config));
+        safeLocalStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(parsed.stats));
+        safeLocalStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(parsed.profile));
+        safeLocalStorage.setItem(STORAGE_KEYS.ACHIEVEMENTS, JSON.stringify(parsed.achievements));
         if (parsed.missions) {
-          localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(parsed.missions));
+          safeLocalStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(parsed.missions));
         }
         if (parsed.missionsDate) {
-          localStorage.setItem(STORAGE_KEYS.MISSIONS_DATE, parsed.missionsDate);
+          safeLocalStorage.setItem(STORAGE_KEYS.MISSIONS_DATE, parsed.missionsDate);
         }
         
         this.saveConfig(parsed.config);
@@ -444,17 +481,17 @@ export const GameStorage = {
   },
 
   getActiveGame(): any | null {
-    const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_GAME);
+    const data = safeLocalStorage.getItem(STORAGE_KEYS.ACTIVE_GAME);
     return data ? JSON.parse(data) : null;
   },
   
   saveActiveGame(state: any) {
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_GAME, JSON.stringify(state));
+    safeLocalStorage.setItem(STORAGE_KEYS.ACTIVE_GAME, JSON.stringify(state));
     IndexedDBBridge.set(STORAGE_KEYS.ACTIVE_GAME, state);
   },
   
   clearActiveGame() {
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
+    safeLocalStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
     IndexedDBBridge.set(STORAGE_KEYS.ACTIVE_GAME, null);
   }
 };

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'logicmatch-v5';
+const CACHE_NAME = 'logicmatch-v6';
 const isDev = self.location.hostname === 'localhost' || 
               self.location.hostname.includes('ais-dev') || 
               self.location.hostname.includes('ais-pre') || 
@@ -80,8 +80,11 @@ if (isDev) {
       // Ignore invalid URL formats
     }
 
-    // For navigation/HTML requests, use Network-First strategy
-    if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    // For navigation/HTML requests or JS/CSS scripts, use Network-First strategy
+    const isNavigation = event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html');
+    const isCodeBundle = event.request.url.endsWith('.js') || event.request.url.endsWith('.css');
+
+    if (isNavigation || isCodeBundle) {
       event.respondWith(
         fetch(event.request)
           .then((response) => {
@@ -94,21 +97,24 @@ if (isDev) {
             return response;
           })
           .catch(() => {
-            return caches.match('/index.html');
+            return caches.match(event.request).then((cached) => {
+              return cached || caches.match('/index.html');
+            });
           })
       );
       return;
     }
 
-    // For all other static assets, use Cache-First, falling back to network
+    // For static images/media, use Cache-First, falling back to network
     event.respondWith(
       caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
         if (cachedResponse) {
           return cachedResponse;
         }
-        return fetch(event.request);
+        return fetch(event.request).catch((err) => {
+          console.warn('[Service Worker] Asset fetch failed:', err);
+        });
       })
     );
   });
 }
-
